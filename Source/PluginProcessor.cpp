@@ -479,8 +479,7 @@ void UltimateProphetProcessor::changeProgramName(int, const juce::String&) {}
 
 juce::AudioProcessorEditor* UltimateProphetProcessor::createEditor()
 {
-    // Temporarily use generic editor until UI redesign
-    return new juce::GenericAudioProcessorEditor(*this);
+    return new UltimateProphetEditor(*this);
 }
 
 bool UltimateProphetProcessor::hasEditor() const { return true; }
@@ -497,6 +496,43 @@ void UltimateProphetProcessor::setStateInformation(const void* data, int sizeInB
     std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
     if (xml && xml->hasTagName(apvts.state.getType()))
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
+}
+
+void UltimateProphetProcessor::loadSysExFile(const juce::File& file)
+{
+    auto patches = SysExLoader::loadFile(file);
+    if (!patches.empty())
+    {
+        loadedPatches = std::move(patches);
+        debugConsole.log("[SYSEX] Loaded %d patches from %s",
+                         (int)loadedPatches.size(), file.getFileName().toRawUTF8());
+        selectPatch(0);
+    }
+    else
+    {
+        debugConsole.log("[SYSEX] ERROR: No patches found in %s",
+                         file.getFileName().toRawUTF8());
+    }
+}
+
+void UltimateProphetProcessor::selectPatch(int index)
+{
+    if (index < 0 || index >= static_cast<int>(loadedPatches.size()))
+        return;
+
+    currentPatchIndex = index;
+    SysExLoader::applyPatchToAPVTS(loadedPatches[static_cast<size_t>(index)], apvts);
+
+    auto& patch = loadedPatches[static_cast<size_t>(index)];
+    debugConsole.log("[PATCH] #%d: \"%s\" (group %d, prog %d)",
+                     index, patch.name.toRawUTF8(), patch.group, patch.program);
+}
+
+juce::String UltimateProphetProcessor::getPatchName(int index) const
+{
+    if (index < 0 || index >= static_cast<int>(loadedPatches.size()))
+        return {};
+    return loadedPatches[static_cast<size_t>(index)].name;
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

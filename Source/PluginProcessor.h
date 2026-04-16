@@ -4,6 +4,7 @@
 #include "DSP/CEM3320Filter.h"
 #include "DSP/LFO.h"
 #include "UI/DebugConsole.h"
+#include "SysExLoader.h"
 
 class UltimateProphetProcessor : public juce::AudioProcessor
 {
@@ -40,6 +41,14 @@ public:
     void addKeyboardMidi(const juce::MidiMessage& msg);
 
     DebugConsole debugConsole;
+
+    // Patch management
+    std::vector<SysExLoader::Patch> loadedPatches;
+    int currentPatchIndex = -1;
+    void loadSysExFile(const juce::File& file);
+    void selectPatch(int index);
+    int getNumLoadedPatches() const { return static_cast<int>(loadedPatches.size()); }
+    juce::String getPatchName(int index) const;
 
     static constexpr int NUM_VOICES = 5;
 

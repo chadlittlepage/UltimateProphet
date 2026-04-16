@@ -32,6 +32,7 @@ target_sources(UltimateProphet
         Source/DSP/Prophet5Voice.cpp
         Source/DSP/Oversampling.cpp
         Source/DSP/LFO.cpp
+        Source/SysExLoader.cpp
         Source/UI/DebugConsole.cpp
 )
 

@@ -16,10 +16,8 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // KeyListener overrides (catches keys even when child components have focus)
     bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;
     bool keyStateChanged(bool isKeyDown, juce::Component* originatingComponent) override;
-
     void timerCallback() override;
     void mouseDown(const juce::MouseEvent& e) override;
     void parentHierarchyChanged() override;
@@ -27,74 +25,89 @@ public:
 private:
     UltimateProphetProcessor& processorRef;
     ProphetLookAndFeel prophetLnf;
-
-    // Debug console panel
     DebugConsolePanel consolePanel;
 
-    // Computer keyboard -> MIDI mapping (Ableton Live style)
+    // QWERTY keyboard (Ableton Live layout)
     int keyboardOctave = 3;
-    float keyVelocity = 100.0f / 127.0f;  // default ~80%, adjustable via C/V
-    std::map<int, int> heldKeys;   // JUCE keyCode -> midiNote that was triggered
+    float keyVelocity = 100.0f / 127.0f;
+    std::map<int, int> heldKeys;
     int getNoteForKey(int textChar) const;
     void sendNoteOn(int midiNote);
     void sendNoteOff(int midiNote);
 
-    // Sliders + attachments for every parameter
-    struct KnobWithLabel
-    {
+    // --- UI Controls ---
+    // Helper types
+    struct Knob {
         juce::Slider slider;
         juce::Label label;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> att;
     };
-
-    struct ComboWithLabel
-    {
-        juce::ComboBox combo;
+    struct Toggle {
+        juce::ToggleButton button;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> att;
+    };
+    struct Combo {
+        juce::ComboBox box;
         juce::Label label;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> attachment;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> att;
     };
 
-    // Oscillators
-    ComboWithLabel oscAWaveform, oscBWaveform;
-    KnobWithLabel oscALevel, oscBLevel, oscBDetune, pulseWidth;
-
-    // Mixer
-    KnobWithLabel noiseLevel;
-
-    // Filter
-    KnobWithLabel filterCutoff, filterResonance, filterEnvAmount, filterKeyTrack;
-
-    // Filter Envelope
-    KnobWithLabel filterAttack, filterDecay, filterSustain, filterRelease;
-
-    // Amp Envelope
-    KnobWithLabel ampAttack, ampDecay, ampSustain, ampRelease;
+    void setupKnob(Knob& k, const juce::String& paramId, const juce::String& name);
+    void setupToggle(Toggle& t, const juce::String& paramId, const juce::String& name);
+    void setupCombo(Combo& c, const juce::String& paramId, const juce::String& name,
+                    const juce::StringArray& items);
 
     // Poly-Mod
-    KnobWithLabel polyModFiltEnvOscA, polyModFiltEnvFilter;
-    KnobWithLabel polyModOscBOscA, polyModOscBFilter;
+    Knob pmFiltEnv, pmOscB;
+    Toggle pmFreqA, pmPWA, pmFilter;
 
-    // External Input
-    KnobWithLabel extInputLevel;
+    // LFO
+    Knob lfoFreq, lfoAmount;
+    Toggle lfoSaw, lfoTri, lfoSqr;
+    Toggle lfoToFreqA, lfoToFreqB, lfoToPWA, lfoToPWB, lfoToFilter;
 
-    // Misc
-    KnobWithLabel analogDrift, masterVolume;
-    juce::ToggleButton oscSyncButton{"Sync"};
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> syncAttachment;
+    // Oscillator A
+    Knob oscAFreq, oscAPW;
+    Toggle oscASaw, oscAPulse;
 
-    // Octave display
-    juce::Label octaveLabel;
+    // Oscillator B
+    Knob oscBFreq, oscBFine, oscBPW;
+    Toggle oscBSaw, oscBTri, oscBPulse, oscBLowFreq, oscBKbd, oscSync;
 
-    void setupKnob(KnobWithLabel& knob, const juce::String& paramId, const juce::String& labelText);
-    void setupCombo(ComboWithLabel& combo, const juce::String& paramId, const juce::String& labelText);
-    void paintWoodPanel(juce::Graphics& g, int x, int y, int w, int h);
-    void paintSectionBox(juce::Graphics& g, int x, int y, int w, int h, const juce::String& title);
+    // Mixer
+    Knob mixA, mixB, mixNoise;
 
-    static constexpr int KNOB_SIZE = 64;
-    static constexpr int LABEL_HEIGHT = 16;
-    static constexpr int SECTION_PAD = 8;
-    static constexpr int WOOD_WIDTH = 28;
-    static constexpr int SYNTH_PANEL_HEIGHT = 490;
+    // Filter
+    Knob filtCutoff, filtReso, filtEnvAmt;
+    Combo filtKeyTrack;
+
+    // Filter Envelope
+    Knob filtAtk, filtDec, filtSus, filtRel;
+
+    // Amp Envelope
+    Knob ampAtk, ampDec, ampSus, ampRel;
+
+    // Performance
+    Knob glideRate, vintage, pitchRange, masterVol;
+    Toggle glideOn, unisonOn, velFilt, velAmp;
+
+    // Patch browser
+    juce::TextButton loadSyxButton{"Load .syx"};
+    juce::TextButton prevPatchButton{"<"};
+    juce::TextButton nextPatchButton{">"};
+    juce::Label patchNameLabel;
+
+    // Octave/velocity display
+    juce::Label statusLabel;
+
+    void paintSection(juce::Graphics& g, int x, int y, int w, int h, const juce::String& title);
+    void updatePatchLabel();
+
+    static constexpr int KW = 58;  // knob width
+    static constexpr int KH = 74;  // knob height (including label)
+    static constexpr int TH = 22;  // toggle height
+    static constexpr int WOOD = 24;
+    static constexpr int SYNTH_H = 520;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(UltimateProphetEditor)
 };
