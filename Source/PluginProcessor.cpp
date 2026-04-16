@@ -14,7 +14,7 @@ UltimateProphetProcessor::UltimateProphetProcessor()
                      .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "Parameters", createParameterLayout())
 {
-    debugConsole.log("[INIT] UltimateProphet v0.2.0");
+    debugConsole.log("[INIT] UltimateProphet v0.3.0 — Prophet-5 Compatible");
 }
 
 UltimateProphetProcessor::~UltimateProphetProcessor() {}
@@ -22,94 +22,131 @@ UltimateProphetProcessor::~UltimateProphetProcessor() {}
 juce::AudioProcessorValueTreeState::ParameterLayout
 UltimateProphetProcessor::createParameterLayout()
 {
-    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> p;
 
-    // --- Oscillator A ---
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        "oscAWaveform", "Osc A Waveform",
-        juce::StringArray{"Saw", "Pulse", "Triangle"}, 0));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "oscALevel", "Osc A Level", 0.0f, 1.0f, 1.0f));
-
-    // --- Oscillator B ---
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        "oscBWaveform", "Osc B Waveform",
-        juce::StringArray{"Saw", "Pulse", "Triangle"}, 0));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "oscBLevel", "Osc B Level", 0.0f, 1.0f, 1.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "oscBDetune", "Osc B Detune",
-        juce::NormalisableRange<float>(-12.0f, 12.0f, 0.01f), 0.0f));
-
-    // --- Pulse Width ---
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "pulseWidth", "Pulse Width",
+    // ===== OSCILLATOR A =====
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "oscAFreq", "Osc A Frequency",
+        juce::NormalisableRange<float>(0.0f, 120.0f, 0.1f), 60.0f));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("oscASaw", "Osc A Saw", true));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("oscAPulse", "Osc A Pulse", false));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "oscAPW", "Osc A Pulse Width",
         juce::NormalisableRange<float>(0.05f, 0.95f, 0.01f), 0.5f));
 
-    // --- Mixer ---
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "noiseLevel", "Noise Level", 0.0f, 1.0f, 0.0f));
+    // ===== OSCILLATOR B =====
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "oscBFreq", "Osc B Frequency",
+        juce::NormalisableRange<float>(0.0f, 120.0f, 0.1f), 60.0f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "oscBFineTune", "Osc B Fine Tune",
+        juce::NormalisableRange<float>(-7.0f, 7.0f, 0.01f), 0.0f));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("oscBSaw", "Osc B Saw", true));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("oscBTri", "Osc B Triangle", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("oscBPulse", "Osc B Pulse", false));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "oscBPW", "Osc B Pulse Width",
+        juce::NormalisableRange<float>(0.05f, 0.95f, 0.01f), 0.5f));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("oscBLowFreq", "Osc B Low Freq", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("oscBKbd", "Osc B Kbd Track", true));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("oscSync", "Osc Sync", false));
 
-    // --- Filter ---
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+    // ===== MIXER =====
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "mixOscA", "Mixer Osc A",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 1.0f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "mixOscB", "Mixer Osc B",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 1.0f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "mixNoise", "Mixer Noise",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+
+    // ===== FILTER =====
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "filterCutoff", "Filter Cutoff",
         juce::NormalisableRange<float>(20.0f, 20000.0f, 0.1f, 0.3f), 10000.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "filterResonance", "Filter Resonance", 0.0f, 1.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "filterEnvAmount", "Filter Env Amount", 0.0f, 1.0f, 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "filterKeyTrack", "Filter Key Track", 0.0f, 1.0f, 0.5f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "filterReso", "Filter Resonance",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "filterEnvAmt", "Filter Env Amount",
+        juce::NormalisableRange<float>(-1.0f, 1.0f, 0.01f), 0.5f));
+    p.push_back(std::make_unique<juce::AudioParameterChoice>(
+        "filterKeyTrack", "Filter Key Track",
+        juce::StringArray{"Off", "Half", "Full"}, 0));
 
-    // --- Filter Envelope ---
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "filterAttack", "Filter Attack",
-        juce::NormalisableRange<float>(0.001f, 10.0f, 0.001f, 0.3f), 0.01f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "filterDecay", "Filter Decay",
-        juce::NormalisableRange<float>(0.001f, 10.0f, 0.001f, 0.3f), 0.3f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "filterSustain", "Filter Sustain", 0.0f, 1.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "filterRelease", "Filter Release",
-        juce::NormalisableRange<float>(0.001f, 10.0f, 0.001f, 0.3f), 0.3f));
+    // ===== LFO =====
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "lfoFreq", "LFO Frequency",
+        juce::NormalisableRange<float>(0.1f, 30.0f, 0.01f, 0.4f), 5.0f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "lfoAmount", "LFO Initial Amount",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("lfoSaw", "LFO Saw", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("lfoTri", "LFO Triangle", true));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("lfoSquare", "LFO Square", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("lfoToFreqA", "LFO > Freq A", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("lfoToFreqB", "LFO > Freq B", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("lfoToPWA", "LFO > PW A", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("lfoToPWB", "LFO > PW B", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("lfoToFilter", "LFO > Filter", false));
 
-    // --- Amp Envelope ---
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "ampAttack", "Amp Attack",
-        juce::NormalisableRange<float>(0.001f, 10.0f, 0.001f, 0.3f), 0.01f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "ampDecay", "Amp Decay",
-        juce::NormalisableRange<float>(0.001f, 10.0f, 0.001f, 0.3f), 0.3f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "ampSustain", "Amp Sustain", 0.0f, 1.0f, 0.8f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "ampRelease", "Amp Release",
-        juce::NormalisableRange<float>(0.001f, 10.0f, 0.001f, 0.3f), 0.3f));
+    // ===== POLY-MOD =====
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "pmodFiltEnv", "Poly-Mod Filt Env Amount",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "pmodOscB", "Poly-Mod Osc B Amount",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("pmodToFreqA", "PMod > Freq A", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("pmodToPWA", "PMod > PW A", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("pmodToFilter", "PMod > Filter", false));
 
-    // --- Poly-Mod ---
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "polyModFiltEnvOscA", "Poly-Mod: Filt Env > Osc A", -1.0f, 1.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "polyModFiltEnvFilter", "Poly-Mod: Filt Env > Filter", -1.0f, 1.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "polyModOscBOscA", "Poly-Mod: Osc B > Osc A", -1.0f, 1.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "polyModOscBFilter", "Poly-Mod: Osc B > Filter", -1.0f, 1.0f, 0.0f));
+    // ===== FILTER ENVELOPE =====
+    auto envRange = juce::NormalisableRange<float>(0.001f, 10.0f, 0.001f, 0.3f);
+    p.push_back(std::make_unique<juce::AudioParameterFloat>("filtAtk", "Filter Attack", envRange, 0.01f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>("filtDec", "Filter Decay", envRange, 0.3f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "filtSus", "Filter Sustain", 0.0f, 1.0f, 0.0f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>("filtRel", "Filter Release", envRange, 0.3f));
 
-    // --- Misc ---
-    params.push_back(std::make_unique<juce::AudioParameterBool>(
-        "oscSync", "Osc Sync", false));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "analogDrift", "Analog Drift", 0.0f, 1.0f, 0.05f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "masterVolume", "Master Volume", 0.0f, 1.0f, 0.7f));
+    // ===== AMP ENVELOPE =====
+    p.push_back(std::make_unique<juce::AudioParameterFloat>("ampAtk", "Amp Attack", envRange, 0.01f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>("ampDec", "Amp Decay", envRange, 0.3f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "ampSus", "Amp Sustain", 0.0f, 1.0f, 0.8f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>("ampRel", "Amp Release", envRange, 0.3f));
 
-    // --- External Input ---
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "extInputLevel", "Ext Input Level", 0.0f, 1.0f, 0.0f));
+    // ===== PERFORMANCE =====
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "glideRate", "Glide Rate",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("glideOn", "Glide On", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("unisonOn", "Unison On", false));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "unisonDetune", "Unison Detune",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.3f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "vintage", "Vintage",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.05f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "pitchWheelRange", "Pitch Wheel Range",
+        juce::NormalisableRange<float>(1.0f, 12.0f, 1.0f), 2.0f));
 
-    return { params.begin(), params.end() };
+    // ===== VELOCITY & AFTERTOUCH =====
+    p.push_back(std::make_unique<juce::AudioParameterBool>("velToFilter", "Vel > Filter", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("velToAmp", "Vel > Amp", true));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("atToFilter", "AT > Filter", false));
+    p.push_back(std::make_unique<juce::AudioParameterBool>("atToLFO", "AT > LFO", false));
+
+    // ===== MASTER =====
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "masterVol", "Master Volume", 0.0f, 1.0f, 0.7f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "extInput", "Ext Input Level", 0.0f, 1.0f, 0.0f));
+
+    return { p.begin(), p.end() };
 }
 
 void UltimateProphetProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -120,22 +157,17 @@ void UltimateProphetProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     for (auto& voice : voices)
         voice.prepare(sampleRate);
 
+    lfo.prepare(sampleRate);
     externalFilter.prepare(sampleRate, Prophet5Voice::OVERSAMPLE_FACTOR);
 
-    // Initialize smoothed values (20ms ramp time for most, 50ms for volume)
     smoothedCutoff.reset(sampleRate, 0.02);
     smoothedResonance.reset(sampleRate, 0.02);
-    smoothedPulseWidth.reset(sampleRate, 0.02);
     smoothedMasterVolume.reset(sampleRate, 0.05);
-    smoothedOscALevel.reset(sampleRate, 0.02);
-    smoothedOscBLevel.reset(sampleRate, 0.02);
-    smoothedNoiseLevel.reset(sampleRate, 0.02);
-    smoothedExtInput.reset(sampleRate, 0.02);
 
     debugConsole.currentSampleRate.store(sampleRate);
     debugConsole.currentBlockSize.store(samplesPerBlock);
     debugConsole.oversampleFactor.store(Prophet5Voice::OVERSAMPLE_FACTOR);
-    debugConsole.log("[AUDIO] prepareToPlay: %.0f Hz, %d samples, %dx OS",
+    debugConsole.log("[AUDIO] prepareToPlay: %.0f Hz, %d smp, %dx OS",
                      sampleRate, samplesPerBlock, Prophet5Voice::OVERSAMPLE_FACTOR);
 }
 
@@ -147,13 +179,11 @@ bool UltimateProphetProcessor::isBusesLayoutSupported(const BusesLayout& layouts
     if (outSet != juce::AudioChannelSet::mono()
      && outSet != juce::AudioChannelSet::stereo())
         return false;
-
     auto inSet = layouts.getMainInputChannelSet();
     if (!inSet.isDisabled()
      && inSet != juce::AudioChannelSet::mono()
      && inSet != juce::AudioChannelSet::stereo())
         return false;
-
     return true;
 }
 
@@ -167,10 +197,9 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                              juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-
     auto startTime = juce::Time::getHighResolutionTicks();
 
-    // Merge keyboard MIDI into the incoming buffer
+    // Merge keyboard MIDI
     {
         const juce::SpinLock::ScopedLockType lock(keyboardMidiLock);
         for (const auto metadata : keyboardMidiBuffer)
@@ -178,145 +207,185 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         keyboardMidiBuffer.clear();
     }
 
-    // Read input audio if available (for external filter mode)
     int numInputChannels = getTotalNumInputChannels();
     const float* inputLeft = (numInputChannels > 0) ? buffer.getReadPointer(0) : nullptr;
-
     buffer.clear();
 
-    // Set smoothed parameter targets from APVTS (once per block)
-    auto oscAWf = static_cast<CEM3340Oscillator::Waveform>(
-        apvts.getRawParameterValue("oscAWaveform")->load());
-    auto oscBWf = static_cast<CEM3340Oscillator::Waveform>(
-        apvts.getRawParameterValue("oscBWaveform")->load());
+    // ===== Read all parameters once per block =====
+    auto& a = apvts;
+    auto load = [&](const char* id) { return a.getRawParameterValue(id)->load(); };
+    auto loadBool = [&](const char* id) { return load(id) > 0.5f; };
 
-    smoothedCutoff.setTargetValue(apvts.getRawParameterValue("filterCutoff")->load());
-    smoothedResonance.setTargetValue(apvts.getRawParameterValue("filterResonance")->load());
-    smoothedPulseWidth.setTargetValue(apvts.getRawParameterValue("pulseWidth")->load());
-    smoothedMasterVolume.setTargetValue(apvts.getRawParameterValue("masterVolume")->load());
-    smoothedOscALevel.setTargetValue(apvts.getRawParameterValue("oscALevel")->load());
-    smoothedOscBLevel.setTargetValue(apvts.getRawParameterValue("oscBLevel")->load());
-    smoothedNoiseLevel.setTargetValue(apvts.getRawParameterValue("noiseLevel")->load());
-    smoothedExtInput.setTargetValue(apvts.getRawParameterValue("extInputLevel")->load());
+    // Osc A
+    float oscAFreq = load("oscAFreq");
+    bool oscASaw = loadBool("oscASaw");
+    bool oscAPulse = loadBool("oscAPulse");
+    float oscAPW = load("oscAPW");
 
-    // Per-block params that don't need smoothing (envelopes, choices, booleans)
-    float filterEnvAmount = apvts.getRawParameterValue("filterEnvAmount")->load();
-    float filterKeyTrack = apvts.getRawParameterValue("filterKeyTrack")->load();
-    float filterAttack = apvts.getRawParameterValue("filterAttack")->load();
-    float filterDecay = apvts.getRawParameterValue("filterDecay")->load();
-    float filterSustain = apvts.getRawParameterValue("filterSustain")->load();
-    float filterRelease = apvts.getRawParameterValue("filterRelease")->load();
-    float ampAttack = apvts.getRawParameterValue("ampAttack")->load();
-    float ampDecay = apvts.getRawParameterValue("ampDecay")->load();
-    float ampSustain = apvts.getRawParameterValue("ampSustain")->load();
-    float ampRelease = apvts.getRawParameterValue("ampRelease")->load();
-    float polyModFEOscA = apvts.getRawParameterValue("polyModFiltEnvOscA")->load();
-    float polyModFEFilt = apvts.getRawParameterValue("polyModFiltEnvFilter")->load();
-    float polyModOBOscA = apvts.getRawParameterValue("polyModOscBOscA")->load();
-    float polyModOBFilt = apvts.getRawParameterValue("polyModOscBFilter")->load();
-    bool oscSync = apvts.getRawParameterValue("oscSync")->load() > 0.5f;
-    float analogDrift = apvts.getRawParameterValue("analogDrift")->load();
-    float oscBDetune = apvts.getRawParameterValue("oscBDetune")->load();
+    // Osc B
+    float oscBFreq = load("oscBFreq");
+    float oscBFine = load("oscBFineTune");
+    bool oscBSaw = loadBool("oscBSaw");
+    bool oscBTri = loadBool("oscBTri");
+    bool oscBPulse = loadBool("oscBPulse");
+    float oscBPW = load("oscBPW");
+    bool oscBLowFreq = loadBool("oscBLowFreq");
+    bool oscBKbd = loadBool("oscBKbd");
+    bool oscSync = loadBool("oscSync");
+
+    // Mixer
+    float mixA = load("mixOscA");
+    float mixB = load("mixOscB");
+    float mixNoise = load("mixNoise");
+
+    // Filter
+    smoothedCutoff.setTargetValue(load("filterCutoff"));
+    smoothedResonance.setTargetValue(load("filterReso"));
+    float filtEnvAmt = load("filterEnvAmt");
+    int filtKeyTrack = static_cast<int>(load("filterKeyTrack"));
+
+    // LFO
+    lfo.setFrequency(load("lfoFreq"));
+    lfo.setSawEnabled(loadBool("lfoSaw"));
+    lfo.setTriangleEnabled(loadBool("lfoTri"));
+    lfo.setSquareEnabled(loadBool("lfoSquare"));
+    float lfoAmt = load("lfoAmount");
+    bool lfoFreqA = loadBool("lfoToFreqA");
+    bool lfoFreqB = loadBool("lfoToFreqB");
+    bool lfoPWA = loadBool("lfoToPWA");
+    bool lfoPWB = loadBool("lfoToPWB");
+    bool lfoFilt = loadBool("lfoToFilter");
+
+    // Poly-Mod
+    float pmodFiltEnv = load("pmodFiltEnv");
+    float pmodOscB = load("pmodOscB");
+    bool pmodFreqA = loadBool("pmodToFreqA");
+    bool pmodPWA = loadBool("pmodToPWA");
+    bool pmodFilter = loadBool("pmodToFilter");
+
+    // Envelopes
+    float filtAtk = load("filtAtk"), filtDec = load("filtDec");
+    float filtSus = load("filtSus"), filtRel = load("filtRel");
+    float ampAtk = load("ampAtk"), ampDec = load("ampDec");
+    float ampSus = load("ampSus"), ampRel = load("ampRel");
+
+    // Performance
+    float glideRate = load("glideRate");
+    bool glideOn = loadBool("glideOn");
+    float vintage = load("vintage");
+    float pitchWheelRange = load("pitchWheelRange");
+    bool velToFilter = loadBool("velToFilter");
+    bool velToAmp = loadBool("velToAmp");
+
+    smoothedMasterVolume.setTargetValue(load("masterVol"));
+    float extInputLevel = load("extInput");
 
     // Process MIDI
     for (const auto metadata : midiMessages)
         handleMidiMessage(metadata.getMessage());
 
-    // Debug: periodic signal level logging
-    static int debugCounter = 0;
-    bool shouldLog = (++debugCounter % 1000 == 0);  // every ~1000 blocks
-
     // Render
     int numSamples = buffer.getNumSamples();
     auto* leftChannel = buffer.getWritePointer(0);
     auto* rightChannel = buffer.getNumChannels() > 1 ? buffer.getWritePointer(1) : nullptr;
-
     float blockPeak = 0.0f;
 
     for (int sample = 0; sample < numSamples; ++sample)
     {
-        // Advance smoothed parameters per-sample
-        float cutoff = smoothedCutoff.getNextValue();
-        float resonance = smoothedResonance.getNextValue();
-        float pw = smoothedPulseWidth.getNextValue();
-        float vol = smoothedMasterVolume.getNextValue();
-        float oscALvl = smoothedOscALevel.getNextValue();
-        float oscBLvl = smoothedOscBLevel.getNextValue();
-        float noiseLvl = smoothedNoiseLevel.getNextValue();
-        float extLevel = smoothedExtInput.getNextValue();
+        // Advance LFO (shared across voices)
+        float lfoVal = lfo.process();
+        float lfoModAmount = lfoAmt + currentModWheel;  // mod wheel adds to LFO
+        lfoModAmount = juce::jlimit(0.0f, 1.0f, lfoModAmount);
 
-        // Update voice params with smoothed values
+        float cutoff = smoothedCutoff.getNextValue();
+        float reso = smoothedResonance.getNextValue();
+        float vol = smoothedMasterVolume.getNextValue();
+
+        // Update all voice params
         for (auto& voice : voices)
         {
-            voice.params.oscAWaveform = oscAWf;
-            voice.params.oscALevel = oscALvl;
-            voice.params.oscBWaveform = oscBWf;
-            voice.params.oscBLevel = oscBLvl;
-            voice.params.oscBDetune = oscBDetune;
-            voice.params.pulseWidth = pw;
-            voice.params.noiseLevel = noiseLvl;
-            voice.params.filterCutoff = cutoff;
-            voice.params.filterResonance = resonance;
-            voice.params.filterEnvAmount = filterEnvAmount;
-            voice.params.filterKeyTrack = filterKeyTrack;
-            voice.params.filterAttack = filterAttack;
-            voice.params.filterDecay = filterDecay;
-            voice.params.filterSustain = filterSustain;
-            voice.params.filterRelease = filterRelease;
-            voice.params.ampAttack = ampAttack;
-            voice.params.ampDecay = ampDecay;
-            voice.params.ampSustain = ampSustain;
-            voice.params.ampRelease = ampRelease;
-            voice.params.polyModFilterEnvToOscA = polyModFEOscA;
-            voice.params.polyModFilterEnvToFilter = polyModFEFilt;
-            voice.params.polyModOscBToOscA = polyModOBOscA;
-            voice.params.polyModOscBToFilter = polyModOBFilt;
+            voice.params.oscASawOn = oscASaw;
+            voice.params.oscAPulseOn = oscAPulse;
+            voice.params.oscAFreqKnob = oscAFreq;
+            voice.params.oscAPulseWidth = oscAPW;
+
+            voice.params.oscBSawOn = oscBSaw;
+            voice.params.oscBTriOn = oscBTri;
+            voice.params.oscBPulseOn = oscBPulse;
+            voice.params.oscBFreqKnob = oscBFreq;
+            voice.params.oscBFineTune = oscBFine;
+            voice.params.oscBPulseWidth = oscBPW;
+            voice.params.oscBLowFreq = oscBLowFreq;
+            voice.params.oscBKbdTrack = oscBKbd;
             voice.params.oscSync = oscSync;
-            voice.params.analogDrift = analogDrift;
+
+            voice.params.oscALevel = mixA;
+            voice.params.oscBLevel = mixB;
+            voice.params.noiseLevel = mixNoise;
+
+            voice.params.filterCutoff = cutoff;
+            voice.params.filterResonance = reso;
+            voice.params.filterEnvAmount = filtEnvAmt;
+            voice.params.filterKeyTrack = filtKeyTrack;
+
+            voice.params.filterAttack = filtAtk;
+            voice.params.filterDecay = filtDec;
+            voice.params.filterSustain = filtSus;
+            voice.params.filterRelease = filtRel;
+            voice.params.ampAttack = ampAtk;
+            voice.params.ampDecay = ampDec;
+            voice.params.ampSustain = ampSus;
+            voice.params.ampRelease = ampRel;
+
+            voice.params.polyModFiltEnvAmt = pmodFiltEnv;
+            voice.params.polyModOscBAmt = pmodOscB;
+            voice.params.polyModToFreqA = pmodFreqA;
+            voice.params.polyModToPWA = pmodPWA;
+            voice.params.polyModToFilter = pmodFilter;
+
+            voice.params.lfoValue = lfoVal;
+            voice.params.lfoAmount = lfoModAmount;
+            voice.params.lfoToFreqA = lfoFreqA;
+            voice.params.lfoToFreqB = lfoFreqB;
+            voice.params.lfoToPWA = lfoPWA;
+            voice.params.lfoToPWB = lfoPWB;
+            voice.params.lfoToFilter = lfoFilt;
+
+            voice.params.pitchBendSemitones = currentPitchBend;
+            voice.params.glideRate = glideRate;
+            voice.params.glideOn = glideOn;
+            voice.params.vintage = vintage;
+            voice.params.velToFilter = velToFilter;
+            voice.params.velToAmp = velToAmp;
         }
 
         float sum = 0.0f;
         for (auto& voice : voices)
             sum += voice.process();
 
-        // External audio input through the CEM3320 filter
-        if (extLevel > 0.001f && inputLeft != nullptr)
+        // External audio input through filter
+        if (extInputLevel > 0.001f && inputLeft != nullptr)
         {
             externalFilter.setCutoff(cutoff);
-            externalFilter.setResonance(resonance);
-
-            float extSample = inputLeft[sample] * extLevel;
-
-            // 4x oversampled filter on external input (sample-and-hold)
+            externalFilter.setResonance(reso);
+            float extSample = inputLeft[sample] * extInputLevel;
             float extFiltered = 0.0f;
             for (int os = 0; os < Prophet5Voice::OVERSAMPLE_FACTOR; ++os)
                 extFiltered = externalFilter.process(extSample);
             sum += extFiltered;
         }
 
-        // Debug log on first sample of periodic blocks
-        if (shouldLog && sample == 0 && std::abs(sum) > 0.0001f)
-        {
-            debugConsole.log("[DSP] sum=%.4f vol=%.2f cutoff=%.0f reso=%.2f",
-                             sum, vol, cutoff, resonance);
-            shouldLog = false;
-        }
-
-        // Soft clip to prevent overs
         sum = std::tanh(sum * vol);
 
         float absSample = std::abs(sum);
-        if (absSample > blockPeak)
-            blockPeak = absSample;
+        if (absSample > blockPeak) blockPeak = absSample;
 
         leftChannel[sample] = sum;
-        if (rightChannel)
-            rightChannel[sample] = sum;
+        if (rightChannel) rightChannel[sample] = sum;
     }
 
-    // Update debug console stats (atomic, no locks)
+    // Update debug stats
     debugConsole.peakLevel.store(blockPeak);
-
     for (int i = 0; i < NUM_VOICES; ++i)
     {
         debugConsole.voiceStats[i].active.store(voices[i].isActive());
@@ -325,7 +394,6 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         debugConsole.voiceStats[i].releasing.store(voices[i].isInRelease());
     }
 
-    // CPU load estimate
     auto endTime = juce::Time::getHighResolutionTicks();
     double elapsedSec = juce::Time::highResolutionTicksToSeconds(endTime - startTime);
     double bufferSec = static_cast<double>(numSamples) / lastSampleRate;
@@ -338,82 +406,61 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
     {
         int note = msg.getNoteNumber();
         float vel = msg.getFloatVelocity();
-
         int voiceIdx = findFreeVoice();
         bool stolen = false;
-        if (voiceIdx < 0)
-        {
-            voiceIdx = findVoiceToSteal();
-            stolen = true;
-        }
-
+        if (voiceIdx < 0) { voiceIdx = findVoiceToSteal(); stolen = true; }
         voices[voiceIdx].noteOn(note, vel, ++noteCounter);
-
         int octave = (note / 12) - 1;
-        if (stolen)
-            debugConsole.log("[MIDI] NoteOn %s%d (v%d) vel=%.2f -> voice %d (STOLEN)",
-                             midiNoteName(note), octave, note, vel, voiceIdx + 1);
-        else
-            debugConsole.log("[MIDI] NoteOn %s%d (v%d) vel=%.2f -> voice %d",
-                             midiNoteName(note), octave, note, vel, voiceIdx + 1);
+        debugConsole.log("[MIDI] NoteOn %s%d vel=%.2f -> voice %d%s",
+                         midiNoteName(note), octave, vel, voiceIdx + 1,
+                         stolen ? " (STOLEN)" : "");
     }
     else if (msg.isNoteOff())
     {
         int note = msg.getNoteNumber();
-        int octave = (note / 12) - 1;
         for (int i = 0; i < NUM_VOICES; ++i)
         {
             if (voices[i].getCurrentNote() == note && voices[i].isActive()
                 && !voices[i].isInRelease())
             {
                 voices[i].noteOff();
-                debugConsole.log("[MIDI] NoteOff %s%d -> voice %d (release)",
-                                 midiNoteName(note), octave, i + 1);
                 break;
             }
         }
     }
     else if (msg.isPitchWheel())
     {
-        debugConsole.log("[MIDI] PitchWheel: %d", msg.getPitchWheelValue());
+        float pitchWheelRange = apvts.getRawParameterValue("pitchWheelRange")->load();
+        float normalized = (msg.getPitchWheelValue() - 8192) / 8192.0f;
+        currentPitchBend = normalized * pitchWheelRange;
     }
     else if (msg.isController())
     {
-        debugConsole.log("[MIDI] CC%d = %d", msg.getControllerNumber(), msg.getControllerValue());
+        int cc = msg.getControllerNumber();
+        float val = msg.getControllerValue() / 127.0f;
+        if (cc == 1)  // Mod wheel
+            currentModWheel = val;
+        debugConsole.log("[MIDI] CC%d = %d", cc, msg.getControllerValue());
     }
 }
 
 int UltimateProphetProcessor::findFreeVoice() const
 {
     for (int i = 0; i < NUM_VOICES; ++i)
-    {
-        if (!voices[i].isActive())
-            return i;
-    }
+        if (!voices[i].isActive()) return i;
     return -1;
 }
 
 int UltimateProphetProcessor::findVoiceToSteal() const
 {
-    // Priority: steal voices in release first (quietest), then oldest active
     int best = 0;
     float bestScore = std::numeric_limits<float>::max();
-
     for (int i = 0; i < NUM_VOICES; ++i)
     {
         float envVal = voices[i].getAmpEnvValue();
         bool releasing = voices[i].isInRelease();
-
-        // Lower score = more stealable.
-        // Releasing voices get score 0..1 (their env value).
-        // Active voices get score 2..3 (offset so releasing always wins).
         float score = releasing ? envVal : (2.0f + envVal);
-
-        if (score < bestScore)
-        {
-            bestScore = score;
-            best = i;
-        }
+        if (score < bestScore) { bestScore = score; best = i; }
     }
     return best;
 }
@@ -432,7 +479,8 @@ void UltimateProphetProcessor::changeProgramName(int, const juce::String&) {}
 
 juce::AudioProcessorEditor* UltimateProphetProcessor::createEditor()
 {
-    return new UltimateProphetEditor(*this);
+    // Temporarily use generic editor until UI redesign
+    return new juce::GenericAudioProcessorEditor(*this);
 }
 
 bool UltimateProphetProcessor::hasEditor() const { return true; }

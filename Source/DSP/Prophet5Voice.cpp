@@ -5,24 +5,28 @@ void Prophet5Voice::prepare(double sr)
     sampleRate = sr;
     oscA.prepare(sr);
     oscB.prepare(sr);
-    // Filter runs at oversampled rate
     filter.prepare(sr, OVERSAMPLE_FACTOR);
     filterEnv.prepare(sr);
     ampEnv.prepare(sr);
     driftCounter = 0;
+    glideCurrentNote = 60.0f;
+    glideTargetNote = 60.0f;
 }
 
 void Prophet5Voice::noteOn(int midiNote, float vel, uint64_t age)
 {
+    // Store previous note for glide
+    if (currentNote >= 0)
+        glideCurrentNote = glideTargetNote;
+
     currentNote = midiNote;
     velocity = vel;
     noteAge = age;
+    glideTargetNote = static_cast<float>(midiNote);
 
-    float hz = midiNoteToHz(static_cast<float>(midiNote));
-
-    oscA.setFrequency(hz);
-    oscB.setFrequency(hz * params.oscBFreqRatio
-        * std::pow(2.0f, params.oscBDetune / 12.0f));
+    // If no glide, snap immediately
+    if (!params.glideOn || params.glideRate < 0.001f)
+        glideCurrentNote = glideTargetNote;
 
     filterEnv.noteOn();
     ampEnv.noteOn();
@@ -46,18 +50,18 @@ float Prophet5Voice::midiNoteToHz(float note) const
 
 void Prophet5Voice::updateDrift()
 {
-    // Update drift targets every ~100 samples (slow random wander)
     if (++driftCounter >= 100)
     {
         driftCounter = 0;
-        driftValueA = (random.nextFloat() * 2.0f - 1.0f) * params.analogDrift;
-        driftValueB = (random.nextFloat() * 2.0f - 1.0f) * params.analogDrift;
+        driftValueA = (random.nextFloat() * 2.0f - 1.0f) * params.vintage;
+        driftValueB = (random.nextFloat() * 2.0f - 1.0f) * params.vintage;
+        driftFilterCutoff = (random.nextFloat() * 2.0f - 1.0f) * params.vintage;
     }
 
-    // Smooth the drift with a very slow one-pole filter
     float driftSmooth = 0.001f;
     driftSmoothA += driftSmooth * (driftValueA - driftSmoothA);
     driftSmoothB += driftSmooth * (driftValueB - driftSmoothB);
+    driftSmoothFilter += driftSmooth * (driftFilterCutoff - driftSmoothFilter);
 }
 
 float Prophet5Voice::process()
@@ -72,48 +76,144 @@ float Prophet5Voice::process()
     filterEnv.setDecay(params.filterDecay);
     filterEnv.setSustain(params.filterSustain);
     filterEnv.setRelease(params.filterRelease);
-
     ampEnv.setAttack(params.ampAttack);
     ampEnv.setDecay(params.ampDecay);
     ampEnv.setSustain(params.ampSustain);
     ampEnv.setRelease(params.ampRelease);
 
-    // --- Update oscillator settings ---
-    oscA.setWaveform(params.oscAWaveform);
-    oscA.setPulseWidth(params.pulseWidth);
-    oscB.setWaveform(params.oscBWaveform);
-    oscB.setPulseWidth(params.pulseWidth);
+    // --- Glide (portamento) ---
+    if (params.glideOn && params.glideRate > 0.001f)
+    {
+        float glideSpeed = 1.0f - params.glideRate * 0.999f;
+        glideCurrentNote += glideSpeed * (glideTargetNote - glideCurrentNote);
+    }
+    else
+    {
+        glideCurrentNote = glideTargetNote;
+    }
 
-    // Apply drift to frequencies
-    float baseHz = midiNoteToHz(static_cast<float>(currentNote));
-    float hzA = baseHz * std::pow(2.0f, driftSmoothA / 1200.0f);  // cents to ratio
-    float hzB = baseHz * params.oscBFreqRatio
-              * std::pow(2.0f, params.oscBDetune / 12.0f)
-              * std::pow(2.0f, driftSmoothB / 1200.0f);
+    // --- Compute base pitch ---
+    // Osc A: freq knob offset + keyboard + pitch bend + drift
+    float oscANote = glideCurrentNote
+                   + (params.oscAFreqKnob - 60.0f)    // freq knob offset from center
+                   + params.pitchBendSemitones
+                   + driftSmoothA;
 
-    // --- Process Poly-Mod sources ---
+    // Osc B: freq knob offset + fine tune + optional keyboard + pitch bend + drift
+    float oscBNote;
+    if (params.oscBLowFreq)
+    {
+        // Low Freq mode: fixed low frequency based on knob only, no keyboard
+        oscBNote = params.oscBFreqKnob - 60.0f + params.oscBFineTune + driftSmoothB;
+        // Shift down ~5 octaves into sub-audio range
+        oscBNote -= 60.0f;
+    }
+    else
+    {
+        oscBNote = (params.oscBKbdTrack ? glideCurrentNote : 60.0f)
+                 + (params.oscBFreqKnob - 60.0f)
+                 + params.oscBFineTune
+                 + params.pitchBendSemitones
+                 + driftSmoothB;
+    }
+
+    // --- Poly-Mod sources ---
     float filterEnvVal = filterEnv.getCurrentValue();
 
-    // We need Osc B output before Osc A for poly-mod routing
-    oscB.setFrequency(hzB);
-    float oscBOut = oscB.process();
+    // Process Osc B first (needed as poly-mod source)
+    oscB.setFrequency(midiNoteToHz(oscBNote));
 
-    // Compute poly-mod
-    polyMod.setFilterEnvToOscAFreq(params.polyModFilterEnvToOscA);
-    polyMod.setFilterEnvToFilterFreq(params.polyModFilterEnvToFilter);
-    polyMod.setOscBToOscAFreq(params.polyModOscBToOscA);
-    polyMod.setOscBToFilterFreq(params.polyModOscBToFilter);
+    // Generate Osc B output: sum of active waveforms
+    float oscBOut = 0.0f;
+    int oscBWaveCount = 0;
+    if (params.oscBSawOn)
+    {
+        oscB.setWaveform(CEM3340Oscillator::Waveform::Saw);
+        oscBOut += oscB.process();
+        oscBWaveCount++;
+    }
+    if (params.oscBTriOn)
+    {
+        oscB.setWaveform(CEM3340Oscillator::Waveform::Triangle);
+        // For stacking: we need to process at the same phase
+        // In reality each waveform is derived from the same saw core
+        // so we use the current phase to compute each waveform
+        // For now, just add the triangle (process advances phase only once)
+        if (oscBWaveCount == 0) {
+            oscBOut += oscB.process();
+            oscBWaveCount++;
+        } else {
+            // Triangle from same phase — approximate by computing from saw
+            float p = oscB.getPhase();
+            float tri = (p < 0.5f) ? (4.0f * p - 1.0f) : (3.0f - 4.0f * p);
+            oscBOut += tri * 0.8f;
+            oscBWaveCount++;
+        }
+    }
+    if (params.oscBPulseOn)
+    {
+        if (oscBWaveCount == 0) {
+            oscB.setWaveform(CEM3340Oscillator::Waveform::Pulse);
+            oscBOut += oscB.process();
+            oscBWaveCount++;
+        } else {
+            float p = oscB.getPhase();
+            float pulse = (p < params.oscBPulseWidth) ? 1.0f : -1.0f;
+            oscBOut += pulse;
+            oscBWaveCount++;
+        }
+    }
+    // If no waveforms active, still advance phase
+    if (oscBWaveCount == 0)
+    {
+        oscB.setWaveform(CEM3340Oscillator::Waveform::Saw);
+        oscB.process();
+    }
+    else if (oscBWaveCount > 1)
+    {
+        oscBOut /= static_cast<float>(oscBWaveCount);
+    }
 
-    auto modResult = polyMod.process(filterEnvVal, oscBOut, hzA, params.filterCutoff);
+    oscB.setPulseWidth(params.oscBPulseWidth);
 
-    // Apply poly-mod to Osc A frequency
-    float modulatedOscAHz = hzA + modResult.oscAFreqMod;
-    modulatedOscAHz = juce::jlimit(1.0f, 20000.0f, modulatedOscAHz);
-    oscA.setFrequency(modulatedOscAHz);
+    // --- Poly-Mod computation ---
+    float polyModSignal = params.polyModFiltEnvAmt * filterEnvVal
+                        + params.polyModOscBAmt * oscBOut;
 
-    // Osc sync: sub-sample accurate hard sync
-    // When Osc B wraps, calculate where in the sample it happened
-    // and reset Osc A's phase to the correct residual
+    // Apply poly-mod to destinations
+    float oscAFreqMod = 0.0f;
+    float oscAPWMod = 0.0f;
+    float filterMod = 0.0f;
+
+    if (params.polyModToFreqA)
+        oscAFreqMod += polyModSignal * 24.0f;  // +/- 2 octaves at full mod
+    if (params.polyModToPWA)
+        oscAPWMod += polyModSignal * 0.4f;     // +/- 40% PW modulation
+    if (params.polyModToFilter)
+        filterMod += polyModSignal * 7.0f;     // +/- 7 octaves of cutoff mod
+
+    // --- LFO modulation ---
+    float lfoMod = params.lfoValue * params.lfoAmount;
+
+    if (params.lfoToFreqA)
+        oscAFreqMod += lfoMod * 3.0f;         // +/- 3 semitones at full
+    if (params.lfoToFreqB)
+        oscBNote += lfoMod * 3.0f;
+    if (params.lfoToPWA)
+        oscAPWMod += lfoMod * 0.3f;
+    if (params.lfoToPWB)
+        oscB.setPulseWidth(juce::jlimit(0.05f, 0.95f,
+            params.oscBPulseWidth + lfoMod * 0.3f));
+    if (params.lfoToFilter)
+        filterMod += lfoMod * 3.0f;           // +/- 3 octaves of cutoff mod
+
+    // --- Apply mod to Osc A and generate output ---
+    float modulatedOscANote = oscANote + oscAFreqMod;
+    oscA.setFrequency(midiNoteToHz(modulatedOscANote));
+    oscA.setPulseWidth(juce::jlimit(0.05f, 0.95f,
+        params.oscAPulseWidth + oscAPWMod));
+
+    // Osc sync
     if (params.oscSync && oscB.hasWrapped())
     {
         float syncFrac = oscB.getWrapFraction();
@@ -121,54 +221,84 @@ float Prophet5Voice::process()
         oscA.hardSync(residual);
     }
 
-    float oscAOut = oscA.process();
+    // Generate Osc A output: sum of active waveforms
+    float oscAOut = 0.0f;
+    int oscAWaveCount = 0;
+    if (params.oscASawOn)
+    {
+        oscA.setWaveform(CEM3340Oscillator::Waveform::Saw);
+        oscAOut += oscA.process();
+        oscAWaveCount++;
+    }
+    if (params.oscAPulseOn)
+    {
+        if (oscAWaveCount == 0) {
+            oscA.setWaveform(CEM3340Oscillator::Waveform::Pulse);
+            oscAOut += oscA.process();
+            oscAWaveCount++;
+        } else {
+            float p = oscA.getPhase();
+            float pw = juce::jlimit(0.05f, 0.95f,
+                params.oscAPulseWidth + oscAPWMod);
+            float pulse = (p < pw) ? 1.0f : -1.0f;
+            oscAOut += pulse;
+            oscAWaveCount++;
+        }
+    }
+    if (oscAWaveCount == 0)
+    {
+        oscA.setWaveform(CEM3340Oscillator::Waveform::Saw);
+        oscA.process();  // advance phase even with no waveforms
+    }
+    else if (oscAWaveCount > 1)
+    {
+        oscAOut /= static_cast<float>(oscAWaveCount);
+    }
 
     // --- Mixer ---
     float mixedSignal = oscAOut * params.oscALevel
                       + oscBOut * params.oscBLevel
                       + (random.nextFloat() * 2.0f - 1.0f) * params.noiseLevel;
 
-    // --- Filter with 4x oversampling ---
-    // Modulate cutoff using exponential (octave) scaling.
-    // This is how real analog synths work: modulation sources shift
-    // the cutoff by octaves, not by a fixed Hz amount.
-    // envAmount of 1.0 = +7 octaves of sweep, matching the Prophet-5.
+    // --- Filter ---
     float filterEnvOut = filterEnv.process();
-    float envOctaves = filterEnvOut * params.filterEnvAmount * 7.0f;
 
-    // Key tracking: 1.0 = cutoff follows pitch exactly (1 oct/oct)
-    float keyOctaves = (static_cast<float>(currentNote) - 60.0f) / 12.0f
-                     * params.filterKeyTrack;
+    // Velocity to filter env
+    float velFilterScale = params.velToFilter ? velocity : 1.0f;
+    float envOctaves = filterEnvOut * params.filterEnvAmount * velFilterScale * 7.0f;
 
-    // Poly-mod contribution (already in Hz, convert to octaves relative to cutoff)
-    float polyModOctaves = 0.0f;
-    if (params.filterCutoff > 20.0f && std::abs(modResult.filterFreqMod) > 0.01f)
-        polyModOctaves = std::log2(juce::jmax(20.0f, params.filterCutoff + modResult.filterFreqMod)
-                                 / params.filterCutoff);
+    // Key tracking: OFF=0, HALF=0.5, FULL=1.0
+    float keyTrackAmount = 0.0f;
+    if (params.filterKeyTrack == 1) keyTrackAmount = 0.5f;
+    else if (params.filterKeyTrack == 2) keyTrackAmount = 1.0f;
+    float keyOctaves = (glideCurrentNote - 60.0f) / 12.0f * keyTrackAmount;
 
-    float totalOctaves = envOctaves + keyOctaves + polyModOctaves;
-    float modulatedCutoff = params.filterCutoff * std::pow(2.0f, totalOctaves);
+    // Poly-mod + LFO + vintage drift contribution to filter
+    float totalFilterOctaves = envOctaves + keyOctaves + filterMod
+                             + driftSmoothFilter * 0.5f;
+
+    float modulatedCutoff = params.filterCutoff * std::pow(2.0f, totalFilterOctaves);
     modulatedCutoff = juce::jlimit(20.0f, 20000.0f, modulatedCutoff);
 
     filter.setCutoff(modulatedCutoff);
     filter.setResonance(params.filterResonance);
 
-    // Sample-and-hold upsampling: feed the same input to the filter
-    // for all oversampled iterations, then take the last output.
+    // 4x oversampled filter (sample-and-hold)
     float filtered = 0.0f;
     for (int os = 0; os < OVERSAMPLE_FACTOR; ++os)
         filtered = filter.process(mixedSignal);
 
-    // NaN protection: if filter blows up, reset it and pass dry signal
+    // NaN protection
     if (std::isnan(filtered) || std::isinf(filtered))
     {
         filter.reset();
         filtered = mixedSignal;
     }
 
-    // --- VCA (Amplitude Envelope) ---
+    // --- VCA ---
     float ampEnvVal = ampEnv.process();
-    float output = filtered * ampEnvVal * velocity;
+    float velAmpScale = params.velToAmp ? velocity : 1.0f;
+    float output = filtered * ampEnvVal * velAmpScale;
 
     return output;
 }

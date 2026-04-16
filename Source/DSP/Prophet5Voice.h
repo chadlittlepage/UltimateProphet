@@ -3,15 +3,20 @@
 #include "CEM3340Oscillator.h"
 #include "CEM3320Filter.h"
 #include "CEM3310Envelope.h"
-#include "PolyModMatrix.h"
+#include "LFO.h"
 
 /**
- * Single Prophet-5 Voice
+ * Single Prophet-5 Voice — Matches Real Hardware Signal Flow
  *
- * Signal flow:
- *   [Osc A] + [Osc B] + [Noise] -> Mixer -> [4x Oversample Filter] -> [VCA] -> Output
- *        ^                              ^         ^
- *   [Poly-Mod from Osc B / Filter Env] [Filter Env]  [Amp Env]
+ *  POLY-MOD:
+ *    Sources: Filter Env, Osc B
+ *    Destinations (toggles): Osc A Freq, Osc A PW, Filter Cutoff
+ *
+ *  LFO → (via amount + mod wheel) → Osc A Freq, Osc B Freq,
+ *                                     Osc A PW, Osc B PW, Filter
+ *
+ *  [Osc A (saw+pulse)] + [Osc B (saw+tri+pulse)] + [Noise]
+ *       → Mixer → VCF (CEM 3320) → VCA → Output
  */
 class Prophet5Voice
 {
@@ -26,57 +31,80 @@ public:
     float getAmpEnvValue() const { return ampEnv.getCurrentValue(); }
     bool isInRelease() const { return ampEnv.getStage() == CEM3310Envelope::Stage::Release; }
 
-    // Per-sample processing
     float process();
 
-    // Voice parameters (set from processor per-sample via smoothed values)
+    // All voice parameters — set from processor each sample
     struct Params
     {
-        // Oscillator A
-        CEM3340Oscillator::Waveform oscAWaveform = CEM3340Oscillator::Waveform::Saw;
+        // --- Oscillator A ---
+        bool oscASawOn = true;
+        bool oscAPulseOn = false;
+        float oscAFreqKnob = 60.0f;    // MIDI note number (0-120)
+        float oscAPulseWidth = 0.5f;
+
+        // --- Oscillator B ---
+        bool oscBSawOn = true;
+        bool oscBTriOn = false;
+        bool oscBPulseOn = false;
+        float oscBFreqKnob = 60.0f;    // MIDI note number (0-120)
+        float oscBFineTune = 0.0f;     // semitones (-7 to +7)
+        float oscBPulseWidth = 0.5f;
+        bool oscBLowFreq = false;      // sub-audio LFO mode
+        bool oscBKbdTrack = true;      // keyboard tracking on/off
+
+        // --- Sync ---
+        bool oscSync = false;
+
+        // --- Mixer ---
         float oscALevel = 1.0f;
-
-        // Oscillator B
-        CEM3340Oscillator::Waveform oscBWaveform = CEM3340Oscillator::Waveform::Saw;
         float oscBLevel = 1.0f;
-        float oscBDetune = 0.0f;        // semitones
-        float oscBFreqRatio = 1.0f;     // frequency ratio (for fixed intervals)
-
-        // Pulse width (shared for now)
-        float pulseWidth = 0.5f;
-
-        // Mixer
         float noiseLevel = 0.0f;
 
-        // Filter
-        float filterCutoff = 10000.0f;  // Hz
-        float filterResonance = 0.0f;   // 0-1
-        float filterEnvAmount = 0.5f;   // 0-1
-        float filterKeyTrack = 0.5f;    // 0-1
+        // --- Filter ---
+        float filterCutoff = 10000.0f;
+        float filterResonance = 0.0f;
+        float filterEnvAmount = 0.5f;   // bipolar: -1 to +1
+        int   filterKeyTrack = 0;       // 0=OFF, 1=HALF, 2=FULL
 
-        // Filter Envelope
+        // --- Filter Envelope ---
         float filterAttack = 0.01f;
         float filterDecay = 0.3f;
         float filterSustain = 0.0f;
         float filterRelease = 0.3f;
 
-        // Amp Envelope
+        // --- Amp Envelope ---
         float ampAttack = 0.01f;
         float ampDecay = 0.3f;
         float ampSustain = 0.8f;
         float ampRelease = 0.3f;
 
-        // Poly-Mod
-        float polyModFilterEnvToOscA = 0.0f;
-        float polyModFilterEnvToFilter = 0.0f;
-        float polyModOscBToOscA = 0.0f;
-        float polyModOscBToFilter = 0.0f;
+        // --- Poly-Mod ---
+        // Two source amount knobs
+        float polyModFiltEnvAmt = 0.0f;  // 0-1
+        float polyModOscBAmt = 0.0f;     // 0-1
+        // Three destination toggles
+        bool polyModToFreqA = false;
+        bool polyModToPWA = false;
+        bool polyModToFilter = false;
 
-        // Osc Sync
-        bool oscSync = false;
+        // --- LFO (values computed in processor, passed per-sample) ---
+        float lfoValue = 0.0f;          // current LFO output (-1 to +1)
+        float lfoAmount = 0.0f;         // initial amount * mod wheel
+        bool lfoToFreqA = false;
+        bool lfoToFreqB = false;
+        bool lfoToPWA = false;
+        bool lfoToPWB = false;
+        bool lfoToFilter = false;
 
-        // Analog drift (per-voice random detuning)
-        float analogDrift = 0.05f;      // cents of random drift
+        // --- Performance ---
+        float pitchBendSemitones = 0.0f; // current pitch bend in semitones
+        float glideRate = 0.0f;          // 0 = instant, 1 = slowest
+        bool glideOn = false;
+        float vintage = 0.05f;           // analog drift amount
+
+        // --- Velocity ---
+        bool velToFilter = false;
+        bool velToAmp = true;
     };
 
     Params params;
@@ -92,16 +120,23 @@ private:
     CEM3320Filter filter;
     CEM3310Envelope filterEnv;
     CEM3310Envelope ampEnv;
-    PolyModMatrix polyMod;
 
     juce::Random random;
     double sampleRate = 44100.0;
     int currentNote = -1;
     float velocity = 0.0f;
     uint64_t noteAge = 0;
+
+    // Glide state
+    float glideCurrentNote = 60.0f;
+    float glideTargetNote = 60.0f;
+
+    // Drift state
     float driftValueA = 0.0f;
     float driftValueB = 0.0f;
     float driftSmoothA = 0.0f;
     float driftSmoothB = 0.0f;
+    float driftFilterCutoff = 0.0f;
+    float driftSmoothFilter = 0.0f;
     int driftCounter = 0;
 };

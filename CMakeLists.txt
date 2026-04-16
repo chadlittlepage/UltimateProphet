@@ -31,6 +31,7 @@ target_sources(UltimateProphet
         Source/DSP/PolyModMatrix.cpp
         Source/DSP/Prophet5Voice.cpp
         Source/DSP/Oversampling.cpp
+        Source/DSP/LFO.cpp
         Source/UI/DebugConsole.cpp
 )
 

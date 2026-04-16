@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "DSP/Prophet5Voice.h"
 #include "DSP/CEM3320Filter.h"
+#include "DSP/LFO.h"
 #include "UI/DebugConsole.h"
 
 class UltimateProphetProcessor : public juce::AudioProcessor
@@ -36,10 +37,8 @@ public:
 
     juce::AudioProcessorValueTreeState& getAPVTS() { return apvts; }
 
-    // Called from editor GUI thread to inject keyboard MIDI
     void addKeyboardMidi(const juce::MidiMessage& msg);
 
-    // Debug console (shared between processor + editor)
     DebugConsole debugConsole;
 
     static constexpr int NUM_VOICES = 5;
@@ -55,25 +54,25 @@ private:
     Prophet5Voice voices[NUM_VOICES];
     uint64_t noteCounter = 0;
 
-    // External audio filter (for using plugin as an effect)
+    // LFO (shared across all voices)
+    LFO lfo;
+
+    // External audio filter
     CEM3320Filter externalFilter;
 
-    // Keyboard MIDI FIFO: GUI thread writes, audio thread reads
-    static constexpr int MIDI_FIFO_SIZE = 256;
+    // Keyboard MIDI FIFO
     juce::MidiBuffer keyboardMidiBuffer;
     juce::SpinLock keyboardMidiLock;
 
-    // Parameter smoothing for zipper-prone controls
+    // Performance state
+    float currentPitchBend = 0.0f;   // in semitones
+    float currentModWheel = 0.0f;    // 0-1
+
+    // Parameter smoothing
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> smoothedCutoff;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedResonance;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPulseWidth;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedMasterVolume;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedOscALevel;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedOscBLevel;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedNoiseLevel;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedExtInput;
 
-    // For CPU measurement
     double lastSampleRate = 44100.0;
     int lastBlockSize = 512;
 
