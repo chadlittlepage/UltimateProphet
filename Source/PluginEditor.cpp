@@ -194,7 +194,7 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
 
     addAndMakeVisible(consolePanel);
     startTimerHz(30);
-    setSize(1050, SYNTH_H + DebugConsolePanel::EXPANDED_HEIGHT);
+    setSize(1150, SYNTH_H + DebugConsolePanel::EXPANDED_HEIGHT);
 
     // Refresh patch display (factory patches may have auto-loaded)
     updatePatchLabel();
@@ -334,19 +334,20 @@ void UltimateProphetEditor::paint(juce::Graphics& g)
 
     // Section boxes (matching Prophet-5 panel order left to right)
     int sy = 24;
-    int sh1 = 240, sh2 = 230;
-    paintSection(g, px,       sy, 135, sh1, "POLY-MOD");
-    paintSection(g, px + 139, sy, 148, sh1, "LFO");
-    paintSection(g, px + 291, sy, 140, sh1, "OSCILLATOR A");
-    paintSection(g, px + 435, sy, 185, sh1, "OSCILLATOR B");
-    paintSection(g, px + 624, sy, 100, sh1, "MIXER");
-    paintSection(g, px + 728, sy, 140, sh1, "FILTER");
-    paintSection(g, px + 872, sy, pw - 872, sh1, "MASTER");
+    int sh1 = 246;
+    paintSection(g, px,       sy, 140, sh1, "POLY-MOD");
+    paintSection(g, px + 144, sy, 158, sh1, "LFO");
+    paintSection(g, px + 306, sy, 150, sh1, "OSCILLATOR A");
+    paintSection(g, px + 460, sy, 200, sh1, "OSCILLATOR B");
+    paintSection(g, px + 664, sy, 105, sh1, "MIXER");
+    paintSection(g, px + 773, sy, 150, sh1, "FILTER");
+    paintSection(g, px + 927, sy, pw - 927, sh1, "MASTER");
 
     int sy2 = sy + sh1 + 4;
-    paintSection(g, px,        sy2, 260, sh2, "FILTER ENVELOPE");
-    paintSection(g, px + 264,  sy2, 260, sh2, "AMPLIFIER ENVELOPE");
-    paintSection(g, px + 528,  sy2, pw - 528, sh2, "PERFORMANCE");
+    int sh2 = 204;
+    paintSection(g, px,        sy2, 280, sh2, "FILTER ENVELOPE");
+    paintSection(g, px + 284,  sy2, 280, sh2, "AMPLIFIER ENVELOPE");
+    paintSection(g, px + 568,  sy2, pw - 568, sh2, "PERFORMANCE");
 
     // Keyboard hint
     g.setColour(juce::Colour(0xff4A4A50));
@@ -373,50 +374,50 @@ void UltimateProphetEditor::resized()
     int sx = px;
     placeKnob(pmFiltEnv, sx, row1);
     placeKnob(pmOscB, sx + KW, row1);
-    placeToggle(pmFreqA, sx, row1 + KH + 4);
-    placeToggle(pmPWA, sx, row1 + KH + TH + 8);
-    placeToggle(pmFilter, sx, row1 + KH + 2 * TH + 12);
+    placeToggle(pmFreqA, sx, row1 + KH + 6);
+    placeToggle(pmPWA, sx, row1 + KH + TH + 10);
+    placeToggle(pmFilter, sx, row1 + KH + 2 * TH + 14);
 
     // ===== LFO =====
-    sx = px + 139;
+    sx = px + 144;
     placeKnob(lfoFreq, sx, row1);
     placeKnob(lfoAmount, sx + KW, row1);
-    placeToggle(lfoSaw, sx, row1 + KH + 4);
-    placeToggle(lfoTri, sx + 66, row1 + KH + 4);
-    placeToggle(lfoSqr, sx, row1 + KH + TH + 8);
-    placeToggle(lfoToFreqA, sx, row1 + KH + 2 * TH + 16);
-    placeToggle(lfoToFreqB, sx + 66, row1 + KH + 2 * TH + 16);
-    placeToggle(lfoToPWA, sx, row1 + KH + 3 * TH + 20);
-    placeToggle(lfoToPWB, sx + 66, row1 + KH + 3 * TH + 20);
-    placeToggle(lfoToFilter, sx, row1 + KH + 4 * TH + 24);
+    placeToggle(lfoSaw, sx, row1 + KH + 6);
+    placeToggle(lfoTri, sx + 70, row1 + KH + 6);
+    placeToggle(lfoSqr, sx, row1 + KH + TH + 10);
+    placeToggle(lfoToFreqA, sx, row1 + KH + 2 * TH + 18);
+    placeToggle(lfoToFreqB, sx + 70, row1 + KH + 2 * TH + 18);
+    placeToggle(lfoToPWA, sx, row1 + KH + 3 * TH + 22);
+    placeToggle(lfoToPWB, sx + 70, row1 + KH + 3 * TH + 22);
+    placeToggle(lfoToFilter, sx, row1 + KH + 4 * TH + 26);
 
     // ===== OSCILLATOR A =====
-    sx = px + 291;
+    sx = px + 306;
     placeKnob(oscAFreq, sx, row1);
     placeKnob(oscAPW, sx + KW, row1);
-    placeToggle(oscASaw, sx, row1 + KH + 4);
-    placeToggle(oscAPulse, sx, row1 + KH + TH + 8);
+    placeToggle(oscASaw, sx, row1 + KH + 6);
+    placeToggle(oscAPulse, sx, row1 + KH + TH + 10);
 
     // ===== OSCILLATOR B =====
-    sx = px + 435;
+    sx = px + 460;
     placeKnob(oscBFreq, sx, row1);
     placeKnob(oscBFine, sx + KW, row1);
     placeKnob(oscBPW, sx + KW * 2, row1);
-    placeToggle(oscBSaw, sx, row1 + KH + 4);
-    placeToggle(oscBTri, sx + 66, row1 + KH + 4);
-    placeToggle(oscBPulse, sx, row1 + KH + TH + 8);
-    placeToggle(oscBLowFreq, sx + 66, row1 + KH + TH + 8);
-    placeToggle(oscBKbd, sx, row1 + KH + 2 * TH + 12);
-    placeToggle(oscSync, sx + 66, row1 + KH + 2 * TH + 12);
+    placeToggle(oscBSaw, sx, row1 + KH + 6);
+    placeToggle(oscBTri, sx + 70, row1 + KH + 6);
+    placeToggle(oscBPulse, sx, row1 + KH + TH + 10);
+    placeToggle(oscBLowFreq, sx + 70, row1 + KH + TH + 10);
+    placeToggle(oscBKbd, sx, row1 + KH + 2 * TH + 14);
+    placeToggle(oscSync, sx + 70, row1 + KH + 2 * TH + 14);
 
     // ===== MIXER =====
-    sx = px + 624;
+    sx = px + 664;
     placeKnob(mixA, sx, row1);
     placeKnob(mixB, sx, row1 + KH + 4);
     placeKnob(mixNoise, sx, row1 + 2 * (KH + 4));
 
     // ===== FILTER =====
-    sx = px + 728;
+    sx = px + 773;
     placeKnob(filtCutoff, sx, row1);
     placeKnob(filtReso, sx + KW, row1);
     placeKnob(filtEnvAmt, sx, row1 + KH + 4);
@@ -424,13 +425,13 @@ void UltimateProphetEditor::resized()
     filtKeyTrack.box.setBounds(sx, row1 + 2 * KH + 24, KW * 2 - 4, 22);
 
     // ===== MASTER =====
-    sx = px + 872;
+    sx = px + 927;
     placeKnob(masterVol, sx, row1);
     placeKnob(vintage, sx, row1 + KH + 4);
     placeKnob(pitchRange, sx, row1 + 2 * (KH + 4));
 
     // ===== ROW 2: ENVELOPES + PERFORMANCE =====
-    int row2 = 24 + 240 + 4 + 18;
+    int row2 = 24 + 246 + 4 + 18;
 
     // Filter Envelope
     sx = px;
@@ -440,28 +441,28 @@ void UltimateProphetEditor::resized()
     placeKnob(filtRel, sx + KW * 3, row2);
 
     // Amp Envelope
-    sx = px + 264;
+    sx = px + 284;
     placeKnob(ampAtk, sx, row2);
     placeKnob(ampDec, sx + KW, row2);
     placeKnob(ampSus, sx + KW * 2, row2);
     placeKnob(ampRel, sx + KW * 3, row2);
 
     // Performance
-    sx = px + 528;
+    sx = px + 568;
     placeKnob(glideRate, sx, row2);
     placeToggle(glideOn, sx + KW, row2 + 10);
     placeToggle(unisonOn, sx + KW, row2 + TH + 14);
-    placeToggle(velFilt, sx + KW + 70, row2 + 10);
-    placeToggle(velAmp, sx + KW + 70, row2 + TH + 14);
+    placeToggle(velFilt, sx + KW + 74, row2 + 10);
+    placeToggle(velAmp, sx + KW + 74, row2 + TH + 14);
 
     statusLabel.setBounds(sx, row2 + KH + 8, 200, 16);
 
-    // Patch browser: top center LCD display (like real Prophet-5)
-    int lcdX = px + (getWidth() - 2 * (WOOD + 4) - 360) / 2;
+    // Patch browser: top center LCD display
+    int lcdX = px + (getWidth() - 2 * (WOOD + 4) - 400) / 2;
     loadSyxButton.setBounds(lcdX, 2, 56, 20);
-    prevPatchButton.setBounds(lcdX + 58, 2, 22, 20);
-    nextPatchButton.setBounds(lcdX + 82, 2, 22, 20);
-    patchNameLabel.setBounds(lcdX + 108, 2, 248, 20);
+    prevPatchButton.setBounds(lcdX + 58, 2, 24, 20);
+    nextPatchButton.setBounds(lcdX + 84, 2, 24, 20);
+    patchNameLabel.setBounds(lcdX + 112, 2, 284, 20);
 
     // Console
     int consoleH = consolePanel.isConsoleVisible()

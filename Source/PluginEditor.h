@@ -103,11 +103,11 @@ private:
     void paintSection(juce::Graphics& g, int x, int y, int w, int h, const juce::String& title);
     void updatePatchLabel();
 
-    static constexpr int KW = 58;  // knob width
-    static constexpr int KH = 74;  // knob height (including label)
+    static constexpr int KW = 62;  // knob width
+    static constexpr int KH = 76;  // knob height (including label)
     static constexpr int TH = 22;  // toggle height
-    static constexpr int WOOD = 24;
-    static constexpr int SYNTH_H = 520;
+    static constexpr int WOOD = 28;
+    static constexpr int SYNTH_H = 500;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(UltimateProphetEditor)
 };
