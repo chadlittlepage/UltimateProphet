@@ -36,43 +36,52 @@ void CEM3320Filter::reset()
 
 float CEM3320Filter::process(float input)
 {
-    // TPT coefficient: g = tan(pi * fc / fs)
+    // TPT coefficient
     float g = std::tan(juce::MathConstants<float>::pi * cutoffHz
             / static_cast<float>(sampleRate));
-    float G = g / (1.0f + g);  // one-pole resolved gain
+    float G = g / (1.0f + g);
 
-    // Resonance: 0-1 maps to k = 0 to 4.25
+    // Resonance: 0-1 maps to k = 0..4.25
     float k = resonance * 4.25f;
 
-    // Gain compensation so volume doesn't drop with resonance
-    float compensation = 1.0f + k;
+    // Gain compensation: moderate, allows some bass thinning
+    // (authentic CEM 3320 behavior — bass drops with resonance)
+    float compensation = 1.0f + k * 0.6f;
 
-    // Feedback from 4th stage OUTPUT (not state!) - one sample delayed
+    // Feedback from 4th stage output (one sample delayed)
     float u = input * compensation - k * lastOutput;
 
-    // Soft clip the ladder input (OTA saturation at ~3V)
-    u = std::tanh(u * 0.33f) * 3.0f;
+    // --- CEM 3320 OTA Cascade ---
+    //
+    // The CEM 3320 uses: I = g * tanh(V+ - V-)
+    // The tanh is applied to the DIFFERENCE (input - state),
+    // not to the input alone. This is the key distinction from
+    // the Moog ladder and gives the CEM its "cutting, sizzley"
+    // resonance character with predominantly even-harmonic distortion.
+    //
+    // Vt controls where saturation kicks in. The CEM 3320 OTA
+    // input saturates at roughly +/-50-100mV in the real circuit,
+    // but our signals are normalized differently. Vt = 1.2 gives
+    // gentle saturation that produces the focused, bright character.
+    static constexpr float Vt = 1.2f;
 
-    // 4 cascaded TPT one-pole stages
-    // CRITICAL: output and state are DIFFERENT in trapezoidal integration
-    //   v = G * (input - state)
-    //   output = v + state          <-- feed to next stage
-    //   state  = output + v         <-- store for next sample
     float out = u;
     for (int i = 0; i < 4; ++i)
     {
-        float v = G * (out - stage[i]);
-        out = v + stage[i];       // OUTPUT of this stage -> next stage input
+        // CEM 3320 OTA: tanh applied to the (input - state) DIFFERENCE
+        float diff = out - stage[i];
+        float saturatedDiff = std::tanh(diff / Vt) * Vt;
+        float v = G * saturatedDiff;
+        out = v + stage[i];       // OUTPUT to next stage
         stage[i] = out + v;       // STATE update (trapezoidal)
     }
 
-    // Store the OUTPUT (not the state) for feedback
     lastOutput = out;
 
     // Denormal / NaN protection
     for (auto& s : stage)
     {
-        if (!(s > -100.0f && s < 100.0f))  // catches NaN and Inf too
+        if (!(s > -100.0f && s < 100.0f))
             s = 0.0f;
     }
     if (!(lastOutput > -100.0f && lastOutput < 100.0f))
