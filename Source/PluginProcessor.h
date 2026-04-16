@@ -62,6 +62,10 @@ private:
 
     Prophet5Voice voices[NUM_VOICES];
     uint64_t noteCounter = 0;
+    bool unisonActive = false;
+    float unisonDetuneAmount = 0.3f;
+    // Per-voice detune offsets (in semitones) for unison spread
+    float voiceDetuneOffset[NUM_VOICES] = { 0.0f, -0.15f, 0.15f, -0.3f, 0.3f };
 
     // LFO (shared across all voices)
     LFO lfo;

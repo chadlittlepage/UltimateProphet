@@ -105,6 +105,9 @@ public:
         // --- Velocity ---
         bool velToFilter = false;
         bool velToAmp = true;
+
+        // --- Unison detune (set per-voice by processor) ---
+        float unisonDetuneSemitones = 0.0f;
     };
 
     Params params;

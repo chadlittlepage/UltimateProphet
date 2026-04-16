@@ -93,10 +93,11 @@ float Prophet5Voice::process()
     }
 
     // --- Compute base pitch ---
-    // Osc A: freq knob offset + keyboard + pitch bend + drift
+    // Osc A: freq knob offset + keyboard + pitch bend + drift + unison detune
     float oscANote = glideCurrentNote
                    + (params.oscAFreqKnob - 60.0f)    // freq knob offset from center
                    + params.pitchBendSemitones
+                   + params.unisonDetuneSemitones      // per-voice unison spread
                    + driftSmoothA;
 
     // Osc B: freq knob offset + fine tune + optional keyboard + pitch bend + drift

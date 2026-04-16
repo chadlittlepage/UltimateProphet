@@ -179,9 +179,9 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
     addAndMakeVisible(nextPatchButton);
 
     patchNameLabel.setText("No patches loaded", juce::dontSendNotification);
-    patchNameLabel.setFont(juce::Font(11.0f));
-    patchNameLabel.setColour(juce::Label::textColourId, juce::Colour(0xffD4A843));
-    patchNameLabel.setJustificationType(juce::Justification::centred);
+    patchNameLabel.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 12.0f, 0));
+    patchNameLabel.setColour(juce::Label::textColourId, juce::Colour(0xff40FF40));
+    patchNameLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(patchNameLabel);
 
     // Status label
@@ -195,6 +195,9 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
     addAndMakeVisible(consolePanel);
     startTimerHz(30);
     setSize(1050, SYNTH_H + DebugConsolePanel::EXPANDED_HEIGHT);
+
+    // Refresh patch display (factory patches may have auto-loaded)
+    updatePatchLabel();
 }
 
 UltimateProphetEditor::~UltimateProphetEditor()
@@ -319,8 +322,15 @@ void UltimateProphetEditor::paint(juce::Graphics& g)
 
     // Header
     g.setColour(juce::Colour(0xffD4A843));
-    g.setFont(juce::Font(16.0f, juce::Font::bold));
-    g.drawText("ULTIMATE PROPHET", px, 2, pw, 20, juce::Justification::centred);
+    g.setFont(juce::Font(14.0f, juce::Font::bold));
+    g.drawText("ULTIMATE PROPHET", px, 2, 200, 20, juce::Justification::left);
+
+    // Center LCD display background (like real Prophet-5)
+    int lcdX = px + (pw - 360) / 2;
+    g.setColour(juce::Colour(0xff0A1408));
+    g.fillRoundedRectangle((float)lcdX, 2.0f, 360.0f, 20.0f, 3.0f);
+    g.setColour(juce::Colour(0xff1A2A18));
+    g.drawRoundedRectangle((float)lcdX, 2.0f, 360.0f, 20.0f, 3.0f, 1.0f);
 
     // Section boxes (matching Prophet-5 panel order left to right)
     int sy = 24;
@@ -446,12 +456,12 @@ void UltimateProphetEditor::resized()
 
     statusLabel.setBounds(sx, row2 + KH + 8, 200, 16);
 
-    // Patch browser (bottom of performance section)
-    int patchY = row2 + KH + 28;
-    loadSyxButton.setBounds(sx, patchY, 70, 22);
-    prevPatchButton.setBounds(sx + 74, patchY, 28, 22);
-    nextPatchButton.setBounds(sx + 104, patchY, 28, 22);
-    patchNameLabel.setBounds(sx + 136, patchY, 300, 22);
+    // Patch browser: top center LCD display (like real Prophet-5)
+    int lcdX = px + (getWidth() - 2 * (WOOD + 4) - 360) / 2;
+    loadSyxButton.setBounds(lcdX, 2, 56, 20);
+    prevPatchButton.setBounds(lcdX + 58, 2, 22, 20);
+    nextPatchButton.setBounds(lcdX + 82, 2, 22, 20);
+    patchNameLabel.setBounds(lcdX + 108, 2, 248, 20);
 
     // Console
     int consoleH = consolePanel.isConsoleVisible()

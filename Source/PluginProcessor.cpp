@@ -15,6 +15,25 @@ UltimateProphetProcessor::UltimateProphetProcessor()
       apvts(*this, nullptr, "Parameters", createParameterLayout())
 {
     debugConsole.log("[INIT] UltimateProphet v0.3.0 — Prophet-5 Compatible");
+
+    // Auto-load factory patches if found
+    auto exePath = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+    // Search several likely locations for the factory .syx
+    juce::StringArray searchPaths = {
+        "/Users/chadlittlepage/Documents/APPs/UltimateProphet/Patches",
+        exePath.getParentDirectory().getChildFile("Patches").getFullPathName(),
+        exePath.getParentDirectory().getParentDirectory().getChildFile("Patches").getFullPathName(),
+    };
+
+    for (auto& path : searchPaths)
+    {
+        juce::File factoryFile(path + "/P5_Factory_Programs_FACTORY_v1.03.syx");
+        if (factoryFile.existsAsFile())
+        {
+            loadSysExFile(factoryFile);
+            break;
+        }
+    }
 }
 
 UltimateProphetProcessor::~UltimateProphetProcessor() {}
@@ -280,6 +299,18 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     smoothedMasterVolume.setTargetValue(load("masterVol"));
     float extInputLevel = load("extInput");
 
+    // Unison
+    unisonActive = loadBool("unisonOn");
+    unisonDetuneAmount = load("unisonDetune");
+    // Compute per-voice detune offsets (symmetric spread in semitones)
+    // Voice 0 = center, 1/2 = slight spread, 3/4 = wider spread
+    float detuneScale = unisonDetuneAmount * 0.5f;  // max 0.25 semitones per side
+    voiceDetuneOffset[0] = 0.0f;
+    voiceDetuneOffset[1] = -detuneScale;
+    voiceDetuneOffset[2] =  detuneScale;
+    voiceDetuneOffset[3] = -detuneScale * 2.0f;
+    voiceDetuneOffset[4] =  detuneScale * 2.0f;
+
     // Process MIDI
     for (const auto metadata : midiMessages)
         handleMidiMessage(metadata.getMessage());
@@ -302,8 +333,10 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         float vol = smoothedMasterVolume.getNextValue();
 
         // Update all voice params
-        for (auto& voice : voices)
+        for (int vi = 0; vi < NUM_VOICES; ++vi)
         {
+            auto& voice = voices[vi];
+            voice.params.unisonDetuneSemitones = unisonActive ? voiceDetuneOffset[vi] : 0.0f;
             voice.params.oscASawOn = oscASaw;
             voice.params.oscAPulseOn = oscAPulse;
             voice.params.oscAFreqKnob = oscAFreq;
@@ -406,25 +439,47 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
     {
         int note = msg.getNoteNumber();
         float vel = msg.getFloatVelocity();
-        int voiceIdx = findFreeVoice();
-        bool stolen = false;
-        if (voiceIdx < 0) { voiceIdx = findVoiceToSteal(); stolen = true; }
-        voices[voiceIdx].noteOn(note, vel, ++noteCounter);
-        int octave = (note / 12) - 1;
-        debugConsole.log("[MIDI] NoteOn %s%d vel=%.2f -> voice %d%s",
-                         midiNoteName(note), octave, vel, voiceIdx + 1,
-                         stolen ? " (STOLEN)" : "");
+
+        if (unisonActive)
+        {
+            // Unison: trigger ALL voices on the same note
+            for (int i = 0; i < NUM_VOICES; ++i)
+                voices[i].noteOn(note, vel, ++noteCounter);
+            debugConsole.log("[MIDI] NoteOn %s%d vel=%.2f -> UNISON (all 5)",
+                             midiNoteName(note), (note / 12) - 1, vel);
+        }
+        else
+        {
+            int voiceIdx = findFreeVoice();
+            bool stolen = false;
+            if (voiceIdx < 0) { voiceIdx = findVoiceToSteal(); stolen = true; }
+            voices[voiceIdx].noteOn(note, vel, ++noteCounter);
+            debugConsole.log("[MIDI] NoteOn %s%d vel=%.2f -> voice %d%s",
+                             midiNoteName(note), (note / 12) - 1, vel, voiceIdx + 1,
+                             stolen ? " (STOLEN)" : "");
+        }
     }
     else if (msg.isNoteOff())
     {
         int note = msg.getNoteNumber();
-        for (int i = 0; i < NUM_VOICES; ++i)
+        if (unisonActive)
         {
-            if (voices[i].getCurrentNote() == note && voices[i].isActive()
-                && !voices[i].isInRelease())
+            // Release all voices playing this note
+            for (int i = 0; i < NUM_VOICES; ++i)
+                if (voices[i].getCurrentNote() == note && voices[i].isActive()
+                    && !voices[i].isInRelease())
+                    voices[i].noteOff();
+        }
+        else
+        {
+            for (int i = 0; i < NUM_VOICES; ++i)
             {
-                voices[i].noteOff();
-                break;
+                if (voices[i].getCurrentNote() == note && voices[i].isActive()
+                    && !voices[i].isInRelease())
+                {
+                    voices[i].noteOff();
+                    break;
+                }
             }
         }
     }
