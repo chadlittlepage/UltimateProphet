@@ -94,6 +94,9 @@ UltimateProphetProcessor::createParameterLayout()
     p.push_back(std::make_unique<juce::AudioParameterChoice>(
         "filterKeyTrack", "Filter Key Track",
         juce::StringArray{"Off", "Half", "Full"}, 0));
+    p.push_back(std::make_unique<juce::AudioParameterChoice>(
+        "filterRev", "Filter Rev",
+        juce::StringArray{"Rev 1/2", "Rev 3"}, 1));  // default Rev 3
 
     // ===== LFO =====
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -260,6 +263,7 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // Filter
     smoothedCutoff.setTargetValue(load("filterCutoff"));
     smoothedResonance.setTargetValue(load("filterReso"));
+    int filterRev = static_cast<int>(load("filterRev"));
     float filtEnvAmt = load("filterEnvAmt");
     int filtKeyTrack = static_cast<int>(load("filterKeyTrack"));
 
@@ -358,6 +362,7 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
             voice.params.filterCutoff = cutoff;
             voice.params.filterResonance = reso;
+            voice.params.filterRev = filterRev;
             voice.params.filterEnvAmount = filtEnvAmt;
             voice.params.filterKeyTrack = filtKeyTrack;
 

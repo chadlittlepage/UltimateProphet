@@ -79,7 +79,7 @@ private:
 
     // Filter
     Knob filtCutoff, filtReso, filtEnvAmt;
-    Combo filtKeyTrack;
+    Combo filtKeyTrack, filtRev;
 
     // Filter Envelope
     Knob filtAtk, filtDec, filtSus, filtRel;

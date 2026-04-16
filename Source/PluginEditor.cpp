@@ -118,6 +118,7 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
     setupKnob(filtReso, "filterReso", "Reso");
     setupKnob(filtEnvAmt, "filterEnvAmt", "Env Amt");
     setupCombo(filtKeyTrack, "filterKeyTrack", "Key Trk", {"Off", "Half", "Full"});
+    setupCombo(filtRev, "filterRev", "Rev", {"1/2", "3"});
 
     // Filter Envelope
     setupKnob(filtAtk, "filtAtk", "A");
@@ -421,8 +422,10 @@ void UltimateProphetEditor::resized()
     placeKnob(filtCutoff, sx, row1);
     placeKnob(filtReso, sx + KW, row1);
     placeKnob(filtEnvAmt, sx, row1 + KH + 4);
-    filtKeyTrack.label.setBounds(sx, row1 + 2 * KH + 12, KW * 2, 12);
-    filtKeyTrack.box.setBounds(sx, row1 + 2 * KH + 24, KW * 2 - 4, 22);
+    filtKeyTrack.label.setBounds(sx, row1 + 2 * KH + 12, KW, 12);
+    filtKeyTrack.box.setBounds(sx, row1 + 2 * KH + 24, KW - 4, 22);
+    filtRev.label.setBounds(sx + KW, row1 + 2 * KH + 12, KW, 12);
+    filtRev.box.setBounds(sx + KW, row1 + 2 * KH + 24, KW - 4, 22);
 
     // ===== MASTER =====
     sx = px + 927;

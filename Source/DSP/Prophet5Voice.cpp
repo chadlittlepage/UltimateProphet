@@ -5,7 +5,8 @@ void Prophet5Voice::prepare(double sr)
     sampleRate = sr;
     oscA.prepare(sr);
     oscB.prepare(sr);
-    filter.prepare(sr, OVERSAMPLE_FACTOR);
+    filterRev3.prepare(sr, OVERSAMPLE_FACTOR);
+    filterRev12.prepare(sr, OVERSAMPLE_FACTOR);
     filterEnv.prepare(sr);
     ampEnv.prepare(sr);
     driftCounter = 0;
@@ -281,19 +282,33 @@ float Prophet5Voice::process()
     float modulatedCutoff = params.filterCutoff * std::pow(2.0f, totalFilterOctaves);
     modulatedCutoff = juce::jlimit(20.0f, 20000.0f, modulatedCutoff);
 
-    filter.setCutoff(modulatedCutoff);
-    filter.setResonance(params.filterResonance);
-
-    // 4x oversampled filter (sample-and-hold)
+    // Select filter based on Rev switch
     float filtered = 0.0f;
-    for (int os = 0; os < OVERSAMPLE_FACTOR; ++os)
-        filtered = filter.process(mixedSignal);
-
-    // NaN protection
-    if (std::isnan(filtered) || std::isinf(filtered))
+    if (params.filterRev == 0)
     {
-        filter.reset();
-        filtered = mixedSignal;
+        // Rev 1/2: SSM 2040
+        filterRev12.setCutoff(modulatedCutoff);
+        filterRev12.setResonance(params.filterResonance);
+        for (int os = 0; os < OVERSAMPLE_FACTOR; ++os)
+            filtered = filterRev12.process(mixedSignal);
+        if (std::isnan(filtered) || std::isinf(filtered))
+        {
+            filterRev12.reset();
+            filtered = mixedSignal;
+        }
+    }
+    else
+    {
+        // Rev 3: CEM 3320
+        filterRev3.setCutoff(modulatedCutoff);
+        filterRev3.setResonance(params.filterResonance);
+        for (int os = 0; os < OVERSAMPLE_FACTOR; ++os)
+            filtered = filterRev3.process(mixedSignal);
+        if (std::isnan(filtered) || std::isinf(filtered))
+        {
+            filterRev3.reset();
+            filtered = mixedSignal;
+        }
     }
 
     // --- VCA ---

@@ -244,6 +244,10 @@ void SysExLoader::applyPatchToAPVTS(const Patch& patch,
     if (auto* param = apvts.getParameter("filterKeyTrack"))
         param->setValueNotifyingHost(static_cast<float>(juce::jlimit(0, 2, (int)p[FILTER_KEY_TRACK])) / 2.0f);
 
+    // Filter Rev: 0=Rev1/2 (SSM 2040), 1=Rev3 (CEM 3320)
+    if (auto* param = apvts.getParameter("filterRev"))
+        param->setValueNotifyingHost(static_cast<float>(juce::jlimit(0, 1, (int)p[FILTER_REV])));
+
     // LFO
     setFloat("lfoFreq",   nrpnToLFOFreq(p[LFO_FREQ]));
     setFloat("lfoAmount",  nrpnToLevel(p[LFO_AMOUNT]));

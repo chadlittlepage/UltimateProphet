@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "CEM3340Oscillator.h"
 #include "CEM3320Filter.h"
+#include "SSM2040Filter.h"
 #include "CEM3310Envelope.h"
 #include "LFO.h"
 
@@ -106,6 +107,9 @@ public:
         bool velToFilter = false;
         bool velToAmp = true;
 
+        // --- Rev switch: 0 = Rev 1/2 (SSM 2040), 1 = Rev 3 (CEM 3320) ---
+        int filterRev = 1;  // default Rev 3
+
         // --- Unison detune (set per-voice by processor) ---
         float unisonDetuneSemitones = 0.0f;
     };
@@ -120,7 +124,8 @@ private:
 
     CEM3340Oscillator oscA;
     CEM3340Oscillator oscB;
-    CEM3320Filter filter;
+    CEM3320Filter filterRev3;      // CEM 3320 (Rev 3)
+    SSM2040Filter filterRev12;     // SSM 2040 (Rev 1/2)
     CEM3310Envelope filterEnv;
     CEM3310Envelope ampEnv;
 
