@@ -160,10 +160,17 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
         }
         else
         {
-            // Store currently held QWERTY notes as chord
+            // Capture from processor's active voices — NOT heldKeys,
+            // because clicking this button steals keyboard focus and
+            // releases all QWERTY keys before onClick fires.
             std::vector<int> notes;
-            for (auto& [key, midiNote] : heldKeys)
-                notes.push_back(midiNote);
+            for (int i = 0; i < UltimateProphetProcessor::NUM_VOICES; ++i)
+            {
+                int note = processorRef.debugConsole.voiceStats[i].note.load();
+                bool active = processorRef.debugConsole.voiceStats[i].active.load();
+                if (active && note >= 0)
+                    notes.push_back(note);
+            }
             if (!notes.empty())
             {
                 processorRef.storeChordMemory(notes);

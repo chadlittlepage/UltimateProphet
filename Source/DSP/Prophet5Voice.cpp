@@ -26,7 +26,7 @@ void Prophet5Voice::noteOn(int midiNote, float vel, uint64_t age)
     glideTargetNote = static_cast<float>(midiNote);
 
     // If no glide, snap immediately
-    if (!params.glideOn || params.glideRate < 0.001f)
+    if (!params.glideOn)
         glideCurrentNote = glideTargetNote;
 
     filterEnv.noteOn();
@@ -92,9 +92,12 @@ float Prophet5Voice::process()
     ampEnv.setReleaseEnabled(params.releaseSwitch);
 
     // --- Glide (portamento) ---
-    if (params.glideOn && params.glideRate > 0.001f)
+    if (params.glideOn)
     {
-        float glideSpeed = 1.0f - params.glideRate * 0.999f;
+        // Rate 0 = fast glide, Rate 1 = very slow glide
+        // Ensure a minimum audible glide even at rate 0
+        float rate = juce::jmax(0.05f, params.glideRate);
+        float glideSpeed = 1.0f - rate * 0.999f;
         glideCurrentNote += glideSpeed * (glideTargetNote - glideCurrentNote);
     }
     else
