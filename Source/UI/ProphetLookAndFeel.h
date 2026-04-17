@@ -103,6 +103,6 @@ public:
         g.setColour(label.findColour(juce::Label::textColourId));
         g.setFont(label.getFont());
         g.drawText(label.getText(), label.getLocalBounds(),
-                   label.getJustificationType(), true);
+                   label.getJustificationType(), false);  // false = NO ellipsis ever
     }
 };
