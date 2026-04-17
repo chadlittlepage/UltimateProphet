@@ -90,7 +90,7 @@ UltimateProphetProcessor::createParameterLayout()
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "filterEnvAmt", "Filter Env Amount",
-        juce::NormalisableRange<float>(-1.0f, 1.0f, 0.01f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
     p.push_back(std::make_unique<juce::AudioParameterChoice>(
         "filterKeyTrack", "Filter Key Track",
         juce::StringArray{"Off", "Half", "Full"}, 0));
