@@ -67,6 +67,21 @@ A circuit-level recreation of the Sequential Prophet-5, featuring both the Rev 1
 - Built-in QWERTY keyboard (Ableton Live layout)
 - Debug console (press backtick to toggle)
 
+## Installation
+
+### Mac (signed — no security warnings)
+Download from [Releases](https://github.com/chadlittlepage/UltimateProphet/releases). Extract and copy:
+- **VST3** → `~/Library/Audio/Plug-Ins/VST3/`
+- **AU** → `~/Library/Audio/Plug-Ins/Components/`
+- **Standalone** → anywhere, double-click to run
+
+### Windows
+1. Download `UltimateProphet-Windows-VST3.zip` from [Releases](https://github.com/chadlittlepage/UltimateProphet/releases)
+2. Extract and copy the `UltimateProphet.vst3` folder to `C:\Program Files\Common Files\VST3\`
+3. Open your DAW and rescan plugins
+
+> **Note:** The Windows build is not code-signed. On first use, Windows SmartScreen may show "Windows protected your PC." Click **"More info"** then **"Run anyway."** This only happens once — the plugin is safe, open source, and you can inspect the code yourself.
+
 ## Building
 
 Requires [JUCE](https://juce.com/) framework and CMake 3.22+.
@@ -109,4 +124,4 @@ A S D F G H J K L ;       (white keys)
 
 ## License
 
-Private repository. All rights reserved.
+Open source. By CELL DIVISION / Kings of Confetti.
