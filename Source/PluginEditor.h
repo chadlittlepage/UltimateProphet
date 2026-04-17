@@ -112,11 +112,11 @@ private:
     static constexpr int KH = 76;  // knob height (including label)
     static constexpr int TH = 22;  // toggle height
     static constexpr int WOOD = 28;
-    static constexpr int SYNTH_H = 500;
+    static constexpr int SYNTH_H = 520;
 
     // Resizable scaling
     static constexpr int DEFAULT_W = 1150;
-    static constexpr int PANEL_H = 500;    // synth panel only
+    static constexpr int PANEL_H = 520;    // synth panel only
     static constexpr int DEFAULT_H = 500 + DebugConsolePanel::COLLAPSED_HEIGHT;
     float scaleFactor = 1.0f;
     juce::ComponentBoundsConstrainer constrainer;

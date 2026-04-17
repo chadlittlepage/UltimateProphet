@@ -445,7 +445,7 @@ void UltimateProphetEditor::paint(juce::Graphics& g)
 
     // Section boxes (matching Prophet-5 panel order left to right)
     int sy = 24;
-    int sh1 = 246;
+    int sh1 = 260;  // taller to fit 3 rows of knobs + value text
     paintSection(g, px,       sy, 140, sh1, "POLY-MOD");
     paintSection(g, px + 144, sy, 170, sh1, "LFO");
     paintSection(g, px + 318, sy, 148, sh1, "OSCILLATOR A");
@@ -578,7 +578,7 @@ void UltimateProphetEditor::resized()
     placeKnob(pitchRange, sx, row1 + 2 * (KH + 4));
 
     // ===== ROW 2: ENVELOPES + PERFORMANCE =====
-    int row2 = 24 + 246 + 4 + 18;
+    int row2 = 24 + 260 + 4 + 18;  // sy + sh1 + gap + header
 
     // Filter Envelope
     sx = px;
