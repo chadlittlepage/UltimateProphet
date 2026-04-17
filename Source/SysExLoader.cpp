@@ -151,8 +151,11 @@ float SysExLoader::nrpnToSustain(int val)
 
 float SysExLoader::nrpnToOscFreq(int val)
 {
-    // 0-120 maps to MIDI note range
-    return static_cast<float>(val);
+    // NRPN 0-120: Prophet-5 freq knob, 4-octave range
+    // Center (60) = no transposition. Our param range is 36-84.
+    // Map: NRPN 0 -> 36, NRPN 60 -> 60, NRPN 120 -> 84
+    float mapped = 36.0f + (static_cast<float>(val) / 120.0f) * 48.0f;
+    return juce::jlimit(36.0f, 84.0f, mapped);
 }
 
 float SysExLoader::nrpnToPulseWidth(int val)
