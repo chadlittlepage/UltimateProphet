@@ -82,23 +82,6 @@ Download from [Releases](https://github.com/chadlittlepage/UltimateProphet/relea
 
 > **Note:** The Windows build is not code-signed. On first use, Windows SmartScreen may show "Windows protected your PC." Click **"More info"** then **"Run anyway."** This only happens once — the plugin is safe, open source, and you can inspect the code yourself.
 
-## Building
-
-Requires [JUCE](https://juce.com/) framework and CMake 3.22+.
-
-```bash
-# Clone JUCE next to the project directory
-git clone https://github.com/juce-framework/JUCE.git ../JUCE
-
-# Build
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release -j
-```
-
-Outputs:
-- `build/UltimateProphet_artefacts/Release/VST3/UltimateProphet.vst3`
-- `build/UltimateProphet_artefacts/Release/AU/UltimateProphet.component` (macOS)
-- `build/UltimateProphet_artefacts/Release/Standalone/UltimateProphet.app` (macOS)
 
 ## QWERTY Keyboard (Ableton Live Layout)
 
