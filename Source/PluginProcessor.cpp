@@ -614,6 +614,20 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
         float normalized = (msg.getPitchWheelValue() - 8192) / 8192.0f;
         currentPitchBend = normalized * pitchWheelRange;
     }
+    else if (msg.isProgramChange())
+    {
+        // Prophet-5: Program Change 0-39 selects program within current bank
+        // Bank is set via CC 32 (Bank Select)
+        // Each bank has 40 programs, total 200 factory + 200 user = 400
+        int prog = msg.getProgramChangeNumber();
+        int patchIndex = currentBank * 40 + juce::jlimit(0, 39, prog);
+        if (patchIndex < getNumLoadedPatches())
+        {
+            selectPatch(patchIndex);
+            debugConsole.log("[MIDI] ProgramChange %d (bank %d) -> patch %d",
+                             prog, currentBank + 1, patchIndex + 1);
+        }
+    }
     else if (msg.isChannelPressure())
     {
         currentAftertouch = msg.getChannelPressureValue() / 127.0f;
@@ -639,6 +653,9 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
 
         switch (cc)
         {
+            case 32:  currentBank = juce::jlimit(0, 9, raw - 1);  // CC 32: Bank Select (1-10 -> 0-9)
+                      debugConsole.log("[MIDI] Bank Select -> %d", currentBank + 1);
+                      break;
             case 3:   setP("oscAFreq", SysExLoader::nrpnToOscFreq(raw)); break;
             case 7:   setP("masterVol", juce::jlimit(0.0f, 1.0f, val120)); break;
             case 9:   setP("oscBFreq", SysExLoader::nrpnToOscFreq(raw)); break;

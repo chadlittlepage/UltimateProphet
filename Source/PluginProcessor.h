@@ -97,6 +97,7 @@ private:
     float currentPitchBend = 0.0f;   // in semitones
     float currentModWheel = 0.0f;    // 0-1
     float currentAftertouch = 0.0f;  // 0-1 (channel pressure)
+    int currentBank = 0;             // 0-9 (set via CC 32 Bank Select)
 
     // Parameter smoothing
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> smoothedCutoff;
