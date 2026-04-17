@@ -98,10 +98,14 @@ public:
         bool lfoToFilter = false;
 
         // --- Performance ---
+        float masterTune = 0.0f;         // +/- 1 semitone
         float pitchBendSemitones = 0.0f; // current pitch bend in semitones
         float glideRate = 0.0f;          // 0 = instant, 1 = slowest
         bool glideOn = false;
         float vintage = 0.05f;           // analog drift amount
+        float aftertouch = 0.0f;         // channel pressure 0-1
+        bool atToFilter = false;         // aftertouch -> filter cutoff
+        bool atToLFO = false;            // aftertouch -> LFO amount
 
         // --- Velocity ---
         bool velToFilter = false;

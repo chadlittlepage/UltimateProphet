@@ -46,7 +46,7 @@ UltimateProphetProcessor::createParameterLayout()
     // ===== OSCILLATOR A =====
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "oscAFreq", "Osc A Frequency",
-        juce::NormalisableRange<float>(0.0f, 120.0f, 0.1f), 60.0f));
+        juce::NormalisableRange<float>(36.0f, 84.0f, 1.0f), 60.0f));  // 4 octaves, semitone steps
     p.push_back(std::make_unique<juce::AudioParameterBool>("oscASaw", "Osc A Saw", true));
     p.push_back(std::make_unique<juce::AudioParameterBool>("oscAPulse", "Osc A Pulse", false));
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -56,7 +56,7 @@ UltimateProphetProcessor::createParameterLayout()
     // ===== OSCILLATOR B =====
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "oscBFreq", "Osc B Frequency",
-        juce::NormalisableRange<float>(0.0f, 120.0f, 0.1f), 60.0f));
+        juce::NormalisableRange<float>(36.0f, 84.0f, 1.0f), 60.0f));  // 4 octaves, semitone steps
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "oscBFineTune", "Osc B Fine Tune",
         juce::NormalisableRange<float>(0.0f, 0.95f, 0.001f), 0.0f));
@@ -146,6 +146,11 @@ UltimateProphetProcessor::createParameterLayout()
     // ===== RELEASE SWITCH =====
     p.push_back(std::make_unique<juce::AudioParameterBool>("releaseSwitch", "Release", true));
 
+    // ===== MASTER TUNE =====
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "masterTune", "Master Tune",
+        juce::NormalisableRange<float>(-1.0f, 1.0f, 0.01f), 0.0f));  // +/- 1 semitone
+
     // ===== PERFORMANCE =====
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "glideRate", "Glide Rate",
@@ -155,6 +160,9 @@ UltimateProphetProcessor::createParameterLayout()
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "unisonDetune", "Unison Detune",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.3f));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "unisonVoices", "Unison Voices",
+        juce::NormalisableRange<float>(1.0f, 5.0f, 1.0f), 5.0f));
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "vintage", "Vintage",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.05f));
@@ -307,6 +315,10 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     bool velToFilter = loadBool("velToFilter");
     bool velToAmp = loadBool("velToAmp");
     bool releaseSwitch = loadBool("releaseSwitch");
+    bool atToFilter = loadBool("atToFilter");
+    bool atToLFO = loadBool("atToLFO");
+    float masterTune = load("masterTune");
+    int unisonVoiceCount = static_cast<int>(load("unisonVoices"));
 
     smoothedMasterVolume.setTargetValue(load("masterVol"));
     float extInputLevel = load("extInput");
@@ -371,7 +383,6 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             voice.params.filterCutoff = cutoff;
             voice.params.filterResonance = reso;
             voice.params.filterRev = filterRev;
-            voice.params.releaseSwitch = releaseSwitch;
             voice.params.filterEnvAmount = filtEnvAmt;
             voice.params.filterKeyTrack = filtKeyTrack;
 
@@ -404,6 +415,11 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             voice.params.vintage = vintage;
             voice.params.velToFilter = velToFilter;
             voice.params.velToAmp = velToAmp;
+            voice.params.masterTune = masterTune;
+            voice.params.releaseSwitch = releaseSwitch;
+            voice.params.aftertouch = currentAftertouch;
+            voice.params.atToFilter = atToFilter;
+            voice.params.atToLFO = atToLFO;
         }
 
         float sum = 0.0f;
@@ -456,11 +472,13 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
 
         if (unisonActive)
         {
-            // Unison: trigger ALL voices on the same note
-            for (int i = 0; i < NUM_VOICES; ++i)
+            // Unison: trigger configured number of voices on the same note
+            int uvc = juce::jlimit(1, NUM_VOICES,
+                static_cast<int>(apvts.getRawParameterValue("unisonVoices")->load()));
+            for (int i = 0; i < uvc; ++i)
                 voices[i].noteOn(note, vel, ++noteCounter);
-            debugConsole.log("[MIDI] NoteOn %s%d vel=%.2f -> UNISON (all 5)",
-                             midiNoteName(note), (note / 12) - 1, vel);
+            debugConsole.log("[MIDI] NoteOn %s%d vel=%.2f -> UNISON (%d voices)",
+                             midiNoteName(note), (note / 12) - 1, vel, uvc);
         }
         else
         {
@@ -499,8 +517,10 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
         int note = msg.getNoteNumber();
         if (unisonActive)
         {
-            // Release all voices playing this note
-            for (int i = 0; i < NUM_VOICES; ++i)
+            // Release all unison voices playing this note
+            int uvc = juce::jlimit(1, NUM_VOICES,
+                static_cast<int>(apvts.getRawParameterValue("unisonVoices")->load()));
+            for (int i = 0; i < uvc; ++i)
                 if (voices[i].getCurrentNote() == note && voices[i].isActive()
                     && !voices[i].isInRelease())
                     voices[i].noteOff();
@@ -523,6 +543,10 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
         float pitchWheelRange = apvts.getRawParameterValue("pitchWheelRange")->load();
         float normalized = (msg.getPitchWheelValue() - 8192) / 8192.0f;
         currentPitchBend = normalized * pitchWheelRange;
+    }
+    else if (msg.isChannelPressure())
+    {
+        currentAftertouch = msg.getChannelPressureValue() / 127.0f;
     }
     else if (msg.isController())
     {

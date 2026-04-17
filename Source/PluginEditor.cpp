@@ -82,6 +82,7 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
     // LFO
     setupKnob(lfoFreq, "lfoFreq", "Freq");
     setupKnob(lfoAmount, "lfoAmount", "Amount");
+    setupKnob(lfoSrcMix, "lfoSrcMix", "Src Mix");
     setupToggle(lfoSaw, "lfoSaw", "Saw");
     setupToggle(lfoTri, "lfoTri", "Tri");
     setupToggle(lfoSqr, "lfoSquare", "Sqr");
@@ -137,10 +138,15 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
     setupToggle(glideOn, "glideOn", "Glide");
     setupKnob(vintage, "vintage", "Vintage");
     setupKnob(masterVol, "masterVol", "Volume");
+    setupKnob(masterTune, "masterTune", "M.Tune");
     setupKnob(pitchRange, "pitchWheelRange", "PB Rng");
     setupToggle(unisonOn, "unisonOn", "Unison");
+    setupKnob(unisonVoices, "unisonVoices", "Uni Vox");
     setupToggle(velFilt, "velToFilter", "V>Filt");
     setupToggle(velAmp, "velToAmp", "V>Amp");
+    setupToggle(releaseSwitch, "releaseSwitch", "Release");
+    setupToggle(atFilter, "atToFilter", "AT>Filt");
+    setupToggle(atLFO, "atToLFO", "AT>LFO");
 
     // Patch browser
     loadSyxButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2A2A2E));
@@ -445,9 +451,10 @@ void UltimateProphetEditor::resized()
     sx = px + 144;
     placeKnob(lfoFreq, sx, row1);
     placeKnob(lfoAmount, sx + KW, row1);
-    placeToggle(lfoSaw, sx, row1 + KH + 6);
-    placeToggle(lfoTri, sx + 70, row1 + KH + 6);
-    placeToggle(lfoSqr, sx, row1 + KH + TH + 10);
+    placeKnob(lfoSrcMix, sx, row1 + KH + 4);
+    placeToggle(lfoSaw, sx + KW, row1 + KH + 6);
+    placeToggle(lfoTri, sx + KW, row1 + KH + TH + 10);
+    placeToggle(lfoSqr, sx + KW, row1 + KH + 2 * TH + 14);
     placeToggle(lfoToFreqA, sx, row1 + KH + 2 * TH + 18);
     placeToggle(lfoToFreqB, sx + 70, row1 + KH + 2 * TH + 18);
     placeToggle(lfoToPWA, sx, row1 + KH + 3 * TH + 22);
@@ -515,12 +522,19 @@ void UltimateProphetEditor::resized()
     // Performance
     sx = px + 568;
     placeKnob(glideRate, sx, row2);
-    placeToggle(glideOn, sx + KW, row2 + 10);
-    placeToggle(unisonOn, sx + KW, row2 + TH + 14);
-    placeToggle(velFilt, sx + KW + 74, row2 + 10);
-    placeToggle(velAmp, sx + KW + 74, row2 + TH + 14);
+    placeKnob(masterTune, sx + KW, row2);
+    placeKnob(unisonVoices, sx + KW * 2, row2);
 
-    statusLabel.setBounds(sx, row2 + KH + 8, 200, 16);
+    int perfTogY = row2 + KH + 4;
+    placeToggle(glideOn, sx, perfTogY);
+    placeToggle(unisonOn, sx + 68, perfTogY);
+    placeToggle(releaseSwitch, sx + 136, perfTogY);
+    placeToggle(velFilt, sx, perfTogY + TH + 4);
+    placeToggle(velAmp, sx + 68, perfTogY + TH + 4);
+    placeToggle(atFilter, sx + 136, perfTogY + TH + 4);
+    placeToggle(atLFO, sx + 204, perfTogY + TH + 4);
+
+    statusLabel.setBounds(sx, perfTogY + 2 * TH + 12, 200, 16);
 
     // Patch browser: top center LCD display
     int lcdX = px + (getWidth() - 2 * (WOOD + 4) - 400) / 2;

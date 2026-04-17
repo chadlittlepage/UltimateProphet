@@ -62,7 +62,7 @@ private:
     Toggle pmFreqA, pmPWA, pmFilter;
 
     // LFO
-    Knob lfoFreq, lfoAmount;
+    Knob lfoFreq, lfoAmount, lfoSrcMix;
     Toggle lfoSaw, lfoTri, lfoSqr;
     Toggle lfoToFreqA, lfoToFreqB, lfoToPWA, lfoToPWB, lfoToFilter;
 
@@ -88,8 +88,8 @@ private:
     Knob ampAtk, ampDec, ampSus, ampRel;
 
     // Performance
-    Knob glideRate, vintage, pitchRange, masterVol;
-    Toggle glideOn, unisonOn, velFilt, velAmp;
+    Knob glideRate, vintage, pitchRange, masterVol, masterTune, unisonVoices;
+    Toggle glideOn, unisonOn, velFilt, velAmp, releaseSwitch, atFilter, atLFO;
 
     // Patch browser
     juce::TextButton loadSyxButton{"Load .syx"};

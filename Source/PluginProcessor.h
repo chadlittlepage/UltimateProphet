@@ -80,6 +80,7 @@ private:
     // Performance state
     float currentPitchBend = 0.0f;   // in semitones
     float currentModWheel = 0.0f;    // 0-1
+    float currentAftertouch = 0.0f;  // 0-1 (channel pressure)
 
     // Parameter smoothing
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> smoothedCutoff;

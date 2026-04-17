@@ -106,6 +106,7 @@ float Prophet5Voice::process()
     // Osc A: freq knob offset + keyboard + pitch bend + drift + unison detune
     float oscANote = glideCurrentNote
                    + (params.oscAFreqKnob - 60.0f)    // freq knob offset from center
+                   + params.masterTune                  // master tune +/- 1 semitone
                    + params.pitchBendSemitones
                    + params.unisonDetuneSemitones      // per-voice unison spread
                    + driftSmoothA;
@@ -166,7 +167,12 @@ float Prophet5Voice::process()
         filterMod += polyModSignal * 7.0f;     // +/- 7 octaves of cutoff mod
 
     // --- LFO modulation ---
-    float lfoMod = params.lfoValue * params.lfoAmount;
+    // Aftertouch adds to LFO amount when AT > LFO is enabled
+    float effectiveLfoAmount = params.lfoAmount;
+    if (params.atToLFO)
+        effectiveLfoAmount += params.aftertouch;
+    effectiveLfoAmount = juce::jlimit(0.0f, 1.0f, effectiveLfoAmount);
+    float lfoMod = params.lfoValue * effectiveLfoAmount;
 
     if (params.lfoToFreqA)
         oscAFreqMod += lfoMod * 3.0f;         // +/- 3 semitones at full
@@ -222,9 +228,14 @@ float Prophet5Voice::process()
     else if (params.filterKeyTrack == 2) keyTrackAmount = 1.0f;
     float keyOctaves = (glideCurrentNote - 60.0f) / 12.0f * keyTrackAmount;
 
-    // Poly-mod + LFO + vintage drift contribution to filter
+    // Aftertouch -> filter cutoff (opens filter when pressing harder)
+    float atFilterMod = 0.0f;
+    if (params.atToFilter)
+        atFilterMod = params.aftertouch * 3.0f;  // up to +3 octaves
+
+    // Poly-mod + LFO + aftertouch + vintage drift contribution to filter
     float totalFilterOctaves = envOctaves + keyOctaves + filterMod
-                             + driftSmoothFilter * 0.5f;
+                             + atFilterMod + driftSmoothFilter * 0.5f;
 
     float modulatedCutoff = params.filterCutoff * std::pow(2.0f, totalFilterOctaves);
     modulatedCutoff = juce::jlimit(20.0f, 20000.0f, modulatedCutoff);
