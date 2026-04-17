@@ -421,6 +421,7 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             voice.params.masterTune = masterTune;
             voice.params.releaseSwitch = releaseSwitch;
             voice.params.aftertouch = currentAftertouch;
+            voice.params.brightness = brightnessOffset;
             voice.params.atToFilter = atToFilter;
             voice.params.atToLFO = atToLFO;
         }
@@ -597,15 +598,19 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
         }
         else
         {
-            for (int i = 0; i < NUM_VOICES; ++i)
+            if (!damperPedalOn)
             {
-                if (voices[i].getCurrentNote() == note && voices[i].isActive()
-                    && !voices[i].isInRelease())
+                for (int i = 0; i < NUM_VOICES; ++i)
                 {
-                    voices[i].noteOff();
-                    break;
+                    if (voices[i].getCurrentNote() == note && voices[i].isActive()
+                        && !voices[i].isInRelease())
+                    {
+                        voices[i].noteOff();
+                        break;
+                    }
                 }
             }
+            // When damper is on, note stays held until pedal releases
         }
     }
     else if (msg.isPitchWheel())
@@ -720,6 +725,29 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
             case 117: setBP("lfoSaw", raw > 63); break;
             case 118: setBP("lfoTri", raw > 63); break;
             case 119: setBP("lfoSquare", raw > 63); break;
+
+            // Additional standard MIDI CCs
+            case 64:  // Damper/sustain pedal
+                      damperPedalOn = (raw > 63);
+                      if (!damperPedalOn) {
+                          // Pedal released: release notes that aren't physically held
+                          for (int i = 0; i < NUM_VOICES; ++i) {
+                              if (voices[i].isActive() && !voices[i].isInRelease()) {
+                                  int vNote = voices[i].getCurrentNote();
+                                  bool stillHeld = std::find(heldNotes.begin(), heldNotes.end(), vNote) != heldNotes.end();
+                                  if (!stillHeld) voices[i].noteOff();
+                              }
+                          }
+                      }
+                      break;
+            case 74:  brightnessOffset = raw / 120.0f;    // Brightness: adds to filter cutoff
+                      break;
+            case 123: // All Notes Off
+                      for (auto& v : voices)
+                          if (v.isActive()) v.noteOff();
+                      heldNotes.clear();
+                      lastUnisonNote = -1;
+                      break;
             default: break;
         }
 
@@ -810,6 +838,45 @@ void UltimateProphetProcessor::clearChordMemory()
     chordNoteCount = 0;
     for (auto& i : chordIntervals) i = 0;
     debugConsole.log("[CHORD] Cleared");
+}
+
+void UltimateProphetProcessor::loadBasicPreset()
+{
+    // Prophet-5 Basic Preset: single saw osc, open filter, basic amp envelope
+    auto set = [&](const char* id, float v) {
+        if (auto* p = apvts.getParameter(id))
+            p->setValueNotifyingHost(p->convertTo0to1(v));
+    };
+    auto setB = [&](const char* id, bool v) {
+        if (auto* p = apvts.getParameter(id))
+            p->setValueNotifyingHost(v ? 1.0f : 0.0f);
+    };
+
+    set("oscAFreq", 60.0f);  setB("oscASaw", true);  setB("oscAPulse", false);
+    set("oscAPW", 0.5f);
+    set("oscBFreq", 60.0f);  set("oscBFineTune", 0.0f);
+    setB("oscBSaw", false);  setB("oscBTri", false);  setB("oscBPulse", false);
+    set("oscBPW", 0.5f);     setB("oscBLowFreq", false);  setB("oscBKbd", true);
+    setB("oscSync", false);
+    set("mixOscA", 1.0f);    set("mixOscB", 0.0f);    set("mixNoise", 0.0f);
+    set("filterCutoff", 20000.0f);  set("filterReso", 0.0f);
+    set("filterEnvAmt", 0.0f);
+    set("lfoFreq", 5.0f);    set("lfoAmount", 0.0f);
+    setB("lfoSaw", false);   setB("lfoTri", true);    setB("lfoSquare", false);
+    set("lfoSrcMix", 0.0f);
+    setB("lfoToFreqA", false); setB("lfoToFreqB", false);
+    setB("lfoToPWA", false);  setB("lfoToPWB", false);  setB("lfoToFilter", false);
+    set("pmodFiltEnv", 0.0f); set("pmodOscB", 0.0f);
+    setB("pmodToFreqA", false); setB("pmodToPWA", false); setB("pmodToFilter", false);
+    set("filtAtk", 0.001f);  set("filtDec", 0.3f);
+    set("filtSus", 0.0f);    set("filtRel", 0.3f);
+    set("ampAtk", 0.001f);   set("ampDec", 0.3f);
+    set("ampSus", 1.0f);     set("ampRel", 0.3f);
+    set("vintage", 0.05f);   set("masterVol", 0.7f);
+    setB("releaseSwitch", true);  setB("unisonOn", false);
+    set("glideRate", 0.0f);  setB("glideOn", false);
+
+    debugConsole.log("[PATCH] Basic Preset loaded");
 }
 
 void UltimateProphetProcessor::loadSysExFile(const juce::File& file)

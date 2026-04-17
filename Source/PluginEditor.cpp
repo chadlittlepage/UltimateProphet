@@ -180,6 +180,15 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
     };
     addAndMakeVisible(chordMemBtn);
 
+    // Init button
+    initButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2A2A2E));
+    initButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffD4A843));
+    initButton.onClick = [this] {
+        processorRef.loadBasicPreset();
+        patchNameLabel.setText("INIT", juce::dontSendNotification);
+    };
+    addAndMakeVisible(initButton);
+
     // Patch browser
     loadSyxButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2A2A2E));
     loadSyxButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffD4A843));
@@ -617,9 +626,10 @@ void UltimateProphetEditor::resized()
     statusLabel.setBounds(sx, perfTogY + 3 * TH + 30, 200, 16);
 
     // Patch browser: top center LCD display (at default coordinates)
-    int lcdX = px + (DEFAULT_W - 2 * (WOOD + 4) - 400) / 2;
-    loadSyxButton.setBounds(lcdX, 2, 56, 20);
-    prevPatchButton.setBounds(lcdX + 58, 2, 24, 20);
-    nextPatchButton.setBounds(lcdX + 84, 2, 24, 20);
-    patchNameLabel.setBounds(lcdX + 112, 2, 284, 20);
+    int lcdX = px + (DEFAULT_W - 2 * (WOOD + 4) - 440) / 2;
+    loadSyxButton.setBounds(lcdX, 2, 52, 20);
+    initButton.setBounds(lcdX + 54, 2, 34, 20);
+    prevPatchButton.setBounds(lcdX + 90, 2, 24, 20);
+    nextPatchButton.setBounds(lcdX + 116, 2, 24, 20);
+    patchNameLabel.setBounds(lcdX + 144, 2, 292, 20);
 }

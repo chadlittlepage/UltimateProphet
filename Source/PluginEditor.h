@@ -95,6 +95,7 @@ private:
 
     // Patch browser
     juce::TextButton loadSyxButton{"Load .syx"};
+    juce::TextButton initButton{"Init"};
     juce::TextButton prevPatchButton{"<"};
     juce::TextButton nextPatchButton{">"};
     juce::Label patchNameLabel;

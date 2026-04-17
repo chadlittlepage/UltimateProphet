@@ -104,6 +104,7 @@ public:
         bool glideOn = false;
         float vintage = 0.05f;           // analog drift amount
         float aftertouch = 0.0f;         // channel pressure 0-1
+        float brightness = 0.0f;         // CC 74, adds to filter cutoff
         bool atToFilter = false;         // aftertouch -> filter cutoff
         bool atToLFO = false;            // aftertouch -> LFO amount
 

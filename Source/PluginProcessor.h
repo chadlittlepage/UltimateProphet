@@ -43,6 +43,7 @@ public:
     // Chord memory: call with currently held notes to store chord
     void storeChordMemory(const std::vector<int>& notes);
     void clearChordMemory();
+    void loadBasicPreset();  // init patch — single saw osc, open filter
     bool isChordMemoryActive() const { return chordMemoryActive; }
 
     DebugConsole debugConsole;
@@ -98,6 +99,8 @@ private:
     float currentModWheel = 0.0f;    // 0-1
     float currentAftertouch = 0.0f;  // 0-1 (channel pressure)
     int currentBank = 0;             // 0-9 (set via CC 32 Bank Select)
+    bool damperPedalOn = false;      // CC 64 sustain pedal
+    float brightnessOffset = 0.0f;   // CC 74 adds to filter cutoff
 
     // Parameter smoothing
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> smoothedCutoff;

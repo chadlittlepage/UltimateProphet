@@ -125,8 +125,14 @@ float Prophet5Voice::process()
     }
     else
     {
+        // When keyboard is OFF, freq knob has 9-octave range (manual)
+        // Normal range is 4 octaves (36-84), scale by 9/4 = 2.25
+        float freqOffset = params.oscBFreqKnob - 60.0f;
+        if (!params.oscBKbdTrack)
+            freqOffset *= 2.25f;  // 9 octaves instead of 4
+
         oscBNote = (params.oscBKbdTrack ? glideCurrentNote : 60.0f)
-                 + (params.oscBFreqKnob - 60.0f)
+                 + freqOffset
                  + params.oscBFineTune
                  + params.pitchBendSemitones
                  + driftSmoothB;
@@ -236,9 +242,13 @@ float Prophet5Voice::process()
     if (params.atToFilter)
         atFilterMod = params.aftertouch * 3.0f;  // up to +3 octaves
 
-    // Poly-mod + LFO + aftertouch + vintage drift contribution to filter
+    // Brightness (CC 74) adds directly to filter cutoff
+    float brightnessMod = params.brightness * 3.0f;  // up to +3 octaves
+
+    // Poly-mod + LFO + aftertouch + brightness + vintage drift
     float totalFilterOctaves = envOctaves + keyOctaves + filterMod
-                             + atFilterMod + driftSmoothFilter * 0.5f;
+                             + atFilterMod + brightnessMod
+                             + driftSmoothFilter * 0.5f;
 
     float modulatedCutoff = params.filterCutoff * std::pow(2.0f, totalFilterOctaves);
     modulatedCutoff = juce::jlimit(20.0f, 20000.0f, modulatedCutoff);
