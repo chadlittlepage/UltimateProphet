@@ -570,11 +570,18 @@ void UltimateProphetEditor::resized()
     }
 
     // Apply transform to synth panel children
+    // Skip the console and JUCE's resize corner dragger
     auto transform = juce::AffineTransform::scale(scaleFactor);
     for (auto* child : getChildren())
     {
-        if (child != &consolePanel)
-            child->setTransform(transform);
+        if (child == &consolePanel)
+            continue;
+        if (dynamic_cast<juce::ResizableCornerComponent*>(child) != nullptr)
+        {
+            child->setTransform({});  // resize handle stays unscaled
+            continue;
+        }
+        child->setTransform(transform);
     }
 
     // Console: full width, below the scaled panel, no transform

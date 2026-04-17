@@ -582,9 +582,11 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
             }
 
             voices[voiceIdx].noteOn(note, vel, ++noteCounter);
-            debugConsole.log("[MIDI] NoteOn %s%d vel=%.2f -> voice %d%s",
+            float dbgFreq = apvts.getRawParameterValue("oscAFreq")->load();
+            debugConsole.log("[MIDI] NoteOn %s%d vel=%.2f -> voice %d%s (oscAFreq=%.1f)",
                              midiNoteName(note), (note / 12) - 1, vel, voiceIdx + 1,
-                             retrigger ? " (RETRIG)" : stolen ? " (STOLEN)" : "");
+                             retrigger ? " (RETRIG)" : stolen ? " (STOLEN)" : "",
+                             dbgFreq);
         }
     }
     else if (msg.isNoteOff())
