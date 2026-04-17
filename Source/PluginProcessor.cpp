@@ -621,10 +621,92 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
     else if (msg.isController())
     {
         int cc = msg.getControllerNumber();
-        float val = msg.getControllerValue() / 127.0f;
-        if (cc == 1)  // Mod wheel
-            currentModWheel = val;
-        debugConsole.log("[MIDI] CC%d = %d", cc, msg.getControllerValue());
+        int raw = msg.getControllerValue();
+        float val = raw / 127.0f;
+        float val120 = raw / 120.0f;  // for 0-120 range params
+
+        if (cc == 1) { currentModWheel = val; }
+
+        // Prophet-5 CC map (from MIDI Implementation v1.4)
+        auto setP = [&](const char* id, float v) {
+            if (auto* p = apvts.getParameter(id))
+                p->setValueNotifyingHost(p->convertTo0to1(v));
+        };
+        auto setBP = [&](const char* id, bool v) {
+            if (auto* p = apvts.getParameter(id))
+                p->setValueNotifyingHost(v ? 1.0f : 0.0f);
+        };
+
+        switch (cc)
+        {
+            case 3:   setP("oscAFreq", SysExLoader::nrpnToOscFreq(raw)); break;
+            case 7:   setP("masterVol", juce::jlimit(0.0f, 1.0f, val120)); break;
+            case 9:   setP("oscBFreq", SysExLoader::nrpnToOscFreq(raw)); break;
+            case 14:  setP("oscBFineTune", SysExLoader::nrpnToFineTune(raw)); break;
+            case 15:  setBP("oscASaw", raw > 63); break;
+            case 20:  setBP("oscAPulse", raw > 63); break;
+            case 21:  setP("oscAPW", SysExLoader::nrpnToPulseWidth(raw)); break;
+            case 22:  setP("oscBPW", SysExLoader::nrpnToPulseWidth(raw)); break;
+            case 23:  setBP("oscSync", raw > 63); break;
+            case 24:  setBP("oscBLowFreq", raw > 63); break;
+            case 25:  setBP("oscBKbd", raw > 63); break;
+            case 26:  setP("glideRate", SysExLoader::nrpnToGlideRate(raw)); break;
+            case 27:  setP("mixOscA", juce::jlimit(0.0f, 1.0f, val120)); break;
+            case 28:  setP("mixOscB", juce::jlimit(0.0f, 1.0f, val120)); break;
+            case 29:  setP("mixNoise", juce::jlimit(0.0f, 1.0f, val120)); break;
+            case 30:  setBP("oscBSaw", raw > 63); break;
+            case 31:  setP("filterReso", SysExLoader::nrpnToResonance(raw)); break;
+            case 35:  if (auto* p = apvts.getParameter("filterKeyTrack"))
+                          p->setValueNotifyingHost(juce::jlimit(0, 2, raw) / 2.0f);
+                      break;
+            case 41:  if (auto* p = apvts.getParameter("filterRev"))
+                          p->setValueNotifyingHost(raw > 63 ? 1.0f : 0.0f);
+                      break;
+            case 46:  setP("lfoFreq", SysExLoader::nrpnToLFOFreq(raw)); break;
+            case 47:  setP("lfoAmount", juce::jlimit(0.0f, 1.0f, val120)); break;
+            case 52:  setBP("oscBTri", raw > 63); break;
+            case 53:  setP("lfoSrcMix", juce::jlimit(0.0f, 1.0f, val120)); break;
+            case 54:  setBP("lfoToFreqA", raw > 63); break;
+            case 55:  setBP("lfoToFreqB", raw > 63); break;
+            case 56:  setBP("lfoToPWA", raw > 63); break;
+            case 57:  setBP("lfoToPWB", raw > 63); break;
+            case 58:  setBP("lfoToFilter", raw > 63); break;
+            case 59:  setP("pmodFiltEnv", juce::jlimit(0.0f, 1.0f, val)); break;
+            case 60:  setP("pmodOscB", juce::jlimit(0.0f, 1.0f, val120)); break;
+            case 61:  setBP("pmodToFreqA", raw > 63); break;
+            case 62:  setBP("pmodToPWA", raw > 63); break;
+            case 63:  setBP("pmodToFilter", raw > 63); break;
+            case 70:  setP("pitchWheelRange", static_cast<float>(juce::jlimit(1, 12, raw + 1))); break;
+            case 71:  if (auto* p = apvts.getParameter("keyPriority"))
+                          p->setValueNotifyingHost(juce::jlimit(0, 3, raw) / 3.0f);
+                      break;
+            case 73:  setP("filterCutoff", SysExLoader::nrpnToCutoffHz(raw)); break;
+            case 85:  setP("vintage", SysExLoader::nrpnToVintage(raw)); break;
+            case 86:  setBP("atToFilter", raw > 63); break;
+            case 87:  setBP("atToLFO", raw > 63); break;
+            case 89:  setP("filterEnvAmt", SysExLoader::nrpnToFilterEnvAmt(raw)); break;
+            case 90:  setBP("velToFilter", raw > 63); break;
+            case 102: setBP("velToAmp", raw > 63); break;
+            case 103: setP("filtAtk", SysExLoader::nrpnToEnvTime(raw)); break;
+            case 104: setP("ampAtk", SysExLoader::nrpnToEnvTime(raw)); break;
+            case 105: setP("filtDec", SysExLoader::nrpnToEnvTime(raw)); break;
+            case 106: setP("ampDec", SysExLoader::nrpnToEnvTime(raw)); break;
+            case 107: setP("filtSus", SysExLoader::nrpnToSustain(raw)); break;
+            case 108: setP("ampSus", SysExLoader::nrpnToSustain(raw)); break;
+            case 109: setP("filtRel", SysExLoader::nrpnToEnvTime(raw)); break;
+            case 110: setP("ampRel", SysExLoader::nrpnToEnvTime(raw)); break;
+            case 111: setBP("releaseSwitch", raw > 63); break;
+            case 112: setBP("unisonOn", raw > 63); break;
+            case 113: setP("unisonVoices", static_cast<float>(juce::jlimit(1, 5, raw))); break;
+            case 114: setP("unisonDetune", juce::jlimit(0.0f, 1.0f, raw / 7.0f)); break;
+            case 116: setBP("oscBPulse", raw > 63); break;
+            case 117: setBP("lfoSaw", raw > 63); break;
+            case 118: setBP("lfoTri", raw > 63); break;
+            case 119: setBP("lfoSquare", raw > 63); break;
+            default: break;
+        }
+
+        debugConsole.log("[MIDI] CC%d = %d", cc, raw);
     }
 }
 
