@@ -53,6 +53,9 @@ UltimateProphetProcessor::UltimateProphetProcessor()
     }
     if (!foundPatches)
         debugConsole.log("[INIT] No factory patches found - use Load .syx");
+
+    // Load user patches (appear after factory in the patch list)
+    loadUserPatches();
 }
 
 UltimateProphetProcessor::~UltimateProphetProcessor() {}
@@ -898,6 +901,77 @@ void UltimateProphetProcessor::loadBasicPreset()
     debugConsole.log("[PATCH] Basic Preset loaded");
 }
 
+juce::File UltimateProphetProcessor::getUserPatchDir() const
+{
+    auto dir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                   .getChildFile("UltimateProphet").getChildFile("UserPatches");
+    dir.createDirectory();
+    return dir;
+}
+
+void UltimateProphetProcessor::saveUserPatch(const juce::String& name)
+{
+    // Save current APVTS state as a user patch XML file
+    auto state = apvts.copyState();
+    auto xml = state.createXml();
+    if (!xml) return;
+
+    // Determine user bank and slot number
+    int userPatchCount = 0;
+    auto dir = getUserPatchDir();
+    auto files = dir.findChildFiles(juce::File::findFiles, false, "*.xml");
+    userPatchCount = files.size();
+
+    int userBank = userPatchCount / 40;  // 40 patches per bank
+    int userSlot = userPatchCount % 40;
+
+    // Save with metadata
+    xml->setAttribute("patchName", name);
+    xml->setAttribute("userBank", userBank);
+    xml->setAttribute("userSlot", userSlot);
+
+    juce::String filename = juce::String(userPatchCount).paddedLeft('0', 3) + "_" + name + ".xml";
+    // Clean filename
+    filename = filename.replaceCharacters(" /\\:*?\"<>|", "___________");
+
+    auto file = dir.getChildFile(filename);
+    xml->writeTo(file);
+
+    debugConsole.log("[SAVE] User patch \"%s\" -> User %d, slot %d",
+                     name.toRawUTF8(), userBank + 1, userSlot + 1);
+
+    // Reload user patches so the new one appears in the browser
+    loadUserPatches();
+}
+
+void UltimateProphetProcessor::loadUserPatches()
+{
+    auto dir = getUserPatchDir();
+    auto files = dir.findChildFiles(juce::File::findFiles, false, "*.xml");
+    files.sort();
+
+    // Remove existing user patches (keep factory)
+    if (loadedPatches.size() > static_cast<size_t>(FACTORY_PATCH_COUNT))
+        loadedPatches.resize(static_cast<size_t>(FACTORY_PATCH_COUNT));
+
+    for (auto& file : files)
+    {
+        auto xml = juce::XmlDocument::parse(file);
+        if (!xml) continue;
+
+        SysExLoader::Patch userPatch;
+        userPatch.name = xml->getStringAttribute("patchName", file.getFileNameWithoutExtension());
+        int userBank = xml->getIntAttribute("userBank", 0);
+        userPatch.group = 10 + userBank;  // User banks start at group 10+
+        userPatch.program = xml->getIntAttribute("userSlot", 0);
+
+        loadedPatches.push_back(userPatch);
+    }
+
+    if (!files.isEmpty())
+        debugConsole.log("[USER] Loaded %d user patches", files.size());
+}
+
 void UltimateProphetProcessor::loadSysExFile(const juce::File& file)
 {
     auto patches = SysExLoader::loadFile(file);
@@ -921,7 +995,30 @@ void UltimateProphetProcessor::selectPatch(int index)
         return;
 
     currentPatchIndex = index;
-    SysExLoader::applyPatchToAPVTS(loadedPatches[static_cast<size_t>(index)], apvts);
+
+    if (index < FACTORY_PATCH_COUNT)
+    {
+        // Factory patch: load from SysEx data
+        SysExLoader::applyPatchToAPVTS(loadedPatches[static_cast<size_t>(index)], apvts);
+    }
+    else
+    {
+        // User patch: load from XML file
+        auto dir = getUserPatchDir();
+        auto files = dir.findChildFiles(juce::File::findFiles, false, "*.xml");
+        files.sort();
+        int userIdx = index - FACTORY_PATCH_COUNT;
+        if (userIdx < files.size())
+        {
+            auto xml = juce::XmlDocument::parse(files[userIdx]);
+            if (xml)
+            {
+                auto tree = juce::ValueTree::fromXml(*xml);
+                if (tree.isValid())
+                    apvts.replaceState(tree);
+            }
+        }
+    }
 
     auto& patch = loadedPatches[static_cast<size_t>(index)];
     debugConsole.log("[PATCH] #%d: \"%s\" (group %d, prog %d)",

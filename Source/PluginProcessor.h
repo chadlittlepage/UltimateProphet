@@ -56,6 +56,12 @@ public:
     int getNumLoadedPatches() const { return static_cast<int>(loadedPatches.size()); }
     juce::String getPatchName(int index) const;
 
+    // User patch save/load
+    static constexpr int FACTORY_PATCH_COUNT = 200;
+    void saveUserPatch(const juce::String& name);
+    void loadUserPatches();
+    juce::File getUserPatchDir() const;
+
     static constexpr int NUM_VOICES = 5;
 
 private:

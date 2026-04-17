@@ -234,6 +234,39 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
     patchNameLabel.addMouseListener(this, false);
     addAndMakeVisible(patchNameLabel);
 
+    // Save button — saves current settings as user patch
+    saveButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2A2A2E));
+    saveButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xff40FF40));
+    saveButton.onClick = [this] {
+        auto dlg = std::make_shared<juce::AlertWindow>(
+            "Save User Patch", "Enter a name for this patch:", juce::MessageBoxIconType::NoIcon);
+        dlg->addTextEditor("name", "My Patch", "Patch Name:");
+        dlg->addButton("Save", 1);
+        dlg->addButton("Cancel", 0);
+        dlg->enterModalState(true, juce::ModalCallbackFunction::create(
+            [this, dlg](int result) {
+                if (result == 1)
+                {
+                    auto name = dlg->getTextEditorContents("name");
+                    if (name.isNotEmpty())
+                    {
+                        processorRef.saveUserPatch(name);
+                        updatePatchLabel();
+                    }
+                }
+            }), true);
+    };
+    addAndMakeVisible(saveButton);
+
+    // Load button — opens user patch directory
+    loadButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2A2A2E));
+    loadButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffD4A843));
+    loadButton.onClick = [this] {
+        processorRef.loadUserPatches();
+        updatePatchLabel();
+    };
+    addAndMakeVisible(loadButton);
+
     // Status label
     statusLabel.setText("Oct: " + juce::String(keyboardOctave)
                       + "  Vel: " + juce::String(juce::roundToInt(keyVelocity * 127.0f)),
@@ -351,13 +384,14 @@ void UltimateProphetEditor::showPatchBrowser()
     if (total <= 0) return;
 
     auto menu = juce::PopupMenu();
+    int factoryCount = juce::jmin(total, UltimateProphetProcessor::FACTORY_PATCH_COUNT);
 
-    // Group patches into banks of 40 (matching Prophet-5 organization)
-    for (int bank = 0; bank * 40 < total; ++bank)
+    // Factory banks (Banks 1-5, 40 patches each)
+    for (int bank = 0; bank * 40 < factoryCount; ++bank)
     {
         auto bankMenu = juce::PopupMenu();
         int start = bank * 40;
-        int end = juce::jmin(start + 40, total);
+        int end = juce::jmin(start + 40, factoryCount);
 
         for (int i = start; i < end; ++i)
         {
@@ -369,6 +403,29 @@ void UltimateProphetEditor::showPatchBrowser()
         juce::String bankName = "Bank " + juce::String(bank + 1)
                               + " (" + juce::String(start + 1) + "-" + juce::String(end) + ")";
         menu.addSubMenu(bankName, bankMenu);
+    }
+
+    // User banks (User 1, User 2, etc. — after factory patches)
+    if (total > factoryCount)
+    {
+        menu.addSeparator();
+        int userTotal = total - factoryCount;
+        for (int uBank = 0; uBank * 40 < userTotal; ++uBank)
+        {
+            auto bankMenu = juce::PopupMenu();
+            int start = factoryCount + uBank * 40;
+            int end = juce::jmin(start + 40, total);
+
+            for (int i = start; i < end; ++i)
+            {
+                juce::String label = juce::String(i - factoryCount + 1) + ". " + processorRef.getPatchName(i);
+                bool isCurrent = (i == processorRef.currentPatchIndex);
+                bankMenu.addItem(i + 1, label, true, isCurrent);
+            }
+
+            juce::String bankName = "User " + juce::String(uBank + 1);
+            menu.addSubMenu(bankName, bankMenu);
+        }
     }
 
     menu.showMenuAsync(juce::PopupMenu::Options()
@@ -635,10 +692,12 @@ void UltimateProphetEditor::resized()
     statusLabel.setBounds(sx, perfTogY + 3 * TH + 30, 200, 16);
 
     // Patch browser: top center LCD display (at default coordinates)
-    int lcdX = px + (DEFAULT_W - 2 * (WOOD + 4) - 440) / 2;
-    loadSyxButton.setBounds(lcdX, 2, 52, 20);
-    initButton.setBounds(lcdX + 54, 2, 34, 20);
-    prevPatchButton.setBounds(lcdX + 90, 2, 24, 20);
-    nextPatchButton.setBounds(lcdX + 116, 2, 24, 20);
-    patchNameLabel.setBounds(lcdX + 144, 2, 292, 20);
+    int lcdX = px + (DEFAULT_W - 2 * (WOOD + 4) - 540) / 2;
+    loadSyxButton.setBounds(lcdX, 2, 48, 20);
+    initButton.setBounds(lcdX + 50, 2, 30, 20);
+    prevPatchButton.setBounds(lcdX + 82, 2, 22, 20);
+    nextPatchButton.setBounds(lcdX + 106, 2, 22, 20);
+    patchNameLabel.setBounds(lcdX + 132, 2, 280, 20);
+    saveButton.setBounds(lcdX + 416, 2, 40, 20);
+    loadButton.setBounds(lcdX + 458, 2, 40, 20);
 }
