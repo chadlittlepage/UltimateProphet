@@ -79,7 +79,7 @@ public:
 
 private:
     DebugConsole& console;
-    bool expanded = true;
+    bool expanded = false;
 
     juce::TextEditor logView;
     juce::TextButton toggleButton{"Console"};

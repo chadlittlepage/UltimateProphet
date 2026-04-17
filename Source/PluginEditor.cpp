@@ -427,6 +427,7 @@ void UltimateProphetEditor::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xffD4A843));
     g.setFont(juce::Font(14.0f, juce::Font::bold));
     g.drawText("ULTIMATE PROPHET", px, 2, 200, 20, juce::Justification::left);
+    g.drawText("Kings of Confetti", pw - 160, 2, 160, 20, juce::Justification::right);
 
     // Center LCD display background (like real Prophet-5)
     int lcdX = px + (pw - 360) / 2;

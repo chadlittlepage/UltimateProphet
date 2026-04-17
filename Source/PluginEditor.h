@@ -116,7 +116,7 @@ private:
 
     // Resizable scaling
     static constexpr int DEFAULT_W = 1150;
-    static constexpr int DEFAULT_H = 500 + DebugConsolePanel::EXPANDED_HEIGHT;
+    static constexpr int DEFAULT_H = 500 + DebugConsolePanel::COLLAPSED_HEIGHT;
     float scaleFactor = 1.0f;
     juce::ComponentBoundsConstrainer constrainer;
 
