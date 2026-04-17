@@ -227,10 +227,9 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
     addAndMakeVisible(consolePanel);
     startTimerHz(30);
 
-    // Enable resizable with fixed aspect ratio
-    constrainer.setFixedAspectRatio(static_cast<double>(DEFAULT_W) / DEFAULT_H);
-    constrainer.setMinimumSize(DEFAULT_W / 2, DEFAULT_H / 2);
-    constrainer.setMaximumSize(DEFAULT_W * 2, DEFAULT_H * 2);
+    // Enable resizable — aspect ratio is managed in resized()
+    constrainer.setMinimumSize(DEFAULT_W / 2, PANEL_H / 2 + DebugConsolePanel::COLLAPSED_HEIGHT);
+    constrainer.setMaximumSize(DEFAULT_W * 2, PANEL_H * 2 + DebugConsolePanel::EXPANDED_HEIGHT);
     setConstrainer(&constrainer);
     setResizable(true, true);  // resizable with corner dragger
     setSize(DEFAULT_W, DEFAULT_H);
@@ -435,7 +434,7 @@ void UltimateProphetEditor::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xffD4A843));
     g.setFont(juce::Font(14.0f, juce::Font::bold));
     g.drawText("ULTIMATE PROPHET", px, 2, 200, 20, juce::Justification::left);
-    g.drawText("Kings of Confetti", pw - 160, 2, 160, 20, juce::Justification::right);
+    g.drawText("Kings of Confetti", px, 2, pw, 20, juce::Justification::right);
 
     // Center LCD display background (like real Prophet-5)
     int lcdX = px + (pw - 360) / 2;
@@ -448,12 +447,12 @@ void UltimateProphetEditor::paint(juce::Graphics& g)
     int sy = 24;
     int sh1 = 246;
     paintSection(g, px,       sy, 140, sh1, "POLY-MOD");
-    paintSection(g, px + 144, sy, 158, sh1, "LFO");
-    paintSection(g, px + 306, sy, 150, sh1, "OSCILLATOR A");
-    paintSection(g, px + 460, sy, 200, sh1, "OSCILLATOR B");
-    paintSection(g, px + 664, sy, 105, sh1, "MIXER");
-    paintSection(g, px + 773, sy, 150, sh1, "FILTER");
-    paintSection(g, px + 927, sy, pw - 927, sh1, "MASTER");
+    paintSection(g, px + 144, sy, 170, sh1, "LFO");
+    paintSection(g, px + 318, sy, 148, sh1, "OSCILLATOR A");
+    paintSection(g, px + 470, sy, 196, sh1, "OSCILLATOR B");
+    paintSection(g, px + 670, sy, 100, sh1, "MIXER");
+    paintSection(g, px + 774, sy, 158, sh1, "FILTER");
+    paintSection(g, px + 936, sy, pw - 936, sh1, "MASTER");
 
     int sy2 = sy + sh1 + 4;
     int sh2 = 204;
@@ -470,23 +469,36 @@ void UltimateProphetEditor::paint(juce::Graphics& g)
 
 void UltimateProphetEditor::resized()
 {
-    // Compute scale factor from current size vs default
+    // Scale factor based on width
     scaleFactor = static_cast<float>(getWidth()) / static_cast<float>(DEFAULT_W);
+    int scaledPanelH = static_cast<int>(PANEL_H * scaleFactor);
 
-    // Apply transform to scale all child components
-    auto transform = juce::AffineTransform::scale(scaleFactor);
-    for (auto* child : getChildren())
-    {
-        if (child != &consolePanel)  // console stays at bottom, full width
-            child->setTransform(transform);
-    }
-
-    // Console at bottom, unscaled (it has its own layout)
+    // Console goes BELOW the synth panel, not over it
     int consoleH = consolePanel.isConsoleVisible()
                  ? DebugConsolePanel::EXPANDED_HEIGHT
                  : DebugConsolePanel::COLLAPSED_HEIGHT;
+    int totalH = scaledPanelH + consoleH;
+
+    // Resize window to fit panel + console
+    if (getHeight() != totalH)
+    {
+        constrainer.setFixedAspectRatio(0);  // temporarily disable aspect ratio
+        setSize(getWidth(), totalH);
+        constrainer.setFixedAspectRatio(static_cast<double>(DEFAULT_W) / PANEL_H);
+        return;  // resized() will be called again with the new size
+    }
+
+    // Apply transform to synth panel children
+    auto transform = juce::AffineTransform::scale(scaleFactor);
+    for (auto* child : getChildren())
+    {
+        if (child != &consolePanel)
+            child->setTransform(transform);
+    }
+
+    // Console: full width, below the scaled panel, no transform
     consolePanel.setTransform({});
-    consolePanel.setBounds(0, getHeight() - consoleH, getWidth(), consoleH);
+    consolePanel.setBounds(0, scaledPanelH, getWidth(), consoleH);
 
     // Layout everything at DEFAULT coordinates (transform handles scaling)
     int px = WOOD + 10;
@@ -509,28 +521,30 @@ void UltimateProphetEditor::resized()
     placeToggle(pmFilter, sx, row1 + KH + 2 * TH + 14);
 
     // ===== LFO =====
-    sx = px + 144;
+    sx = px + 150;
     placeKnob(lfoFreq, sx, row1);
     placeKnob(lfoAmount, sx + KW, row1);
-    placeKnob(lfoSrcMix, sx, row1 + KH + 4);
-    placeToggle(lfoSaw, sx + KW, row1 + KH + 6);
-    placeToggle(lfoTri, sx + KW, row1 + KH + TH + 10);
-    placeToggle(lfoSqr, sx + KW, row1 + KH + 2 * TH + 14);
-    placeToggle(lfoToFreqA, sx, row1 + KH + 2 * TH + 18);
-    placeToggle(lfoToFreqB, sx + 70, row1 + KH + 2 * TH + 18);
-    placeToggle(lfoToPWA, sx, row1 + KH + 3 * TH + 22);
-    placeToggle(lfoToPWB, sx + 70, row1 + KH + 3 * TH + 22);
-    placeToggle(lfoToFilter, sx, row1 + KH + 4 * TH + 26);
+    int lfoR2 = row1 + KH + 2;
+    placeKnob(lfoSrcMix, sx, lfoR2);
+    placeToggle(lfoSaw, sx + KW + 4, lfoR2);
+    placeToggle(lfoTri, sx + KW + 4, lfoR2 + TH + 2);
+    placeToggle(lfoSqr, sx + KW + 4, lfoR2 + 2 * (TH + 2));
+    int lfoR3 = lfoR2 + KH + 2;
+    placeToggle(lfoToFreqA, sx, lfoR3);
+    placeToggle(lfoToFreqB, sx + 68, lfoR3);
+    placeToggle(lfoToPWA, sx, lfoR3 + TH + 2);
+    placeToggle(lfoToPWB, sx + 68, lfoR3 + TH + 2);
+    placeToggle(lfoToFilter, sx, lfoR3 + 2 * (TH + 2));
 
     // ===== OSCILLATOR A =====
-    sx = px + 306;
+    sx = px + 324;
     placeKnob(oscAFreq, sx, row1);
     placeKnob(oscAPW, sx + KW, row1);
     placeToggle(oscASaw, sx, row1 + KH + 6);
     placeToggle(oscAPulse, sx, row1 + KH + TH + 10);
 
     // ===== OSCILLATOR B =====
-    sx = px + 460;
+    sx = px + 476;
     placeKnob(oscBFreq, sx, row1);
     placeKnob(oscBFine, sx + KW, row1);
     placeKnob(oscBPW, sx + KW * 2, row1);
@@ -542,13 +556,13 @@ void UltimateProphetEditor::resized()
     placeToggle(oscSync, sx + 70, row1 + KH + 2 * TH + 14);
 
     // ===== MIXER =====
-    sx = px + 664;
+    sx = px + 676;
     placeKnob(mixA, sx, row1);
     placeKnob(mixB, sx, row1 + KH + 4);
     placeKnob(mixNoise, sx, row1 + 2 * (KH + 4));
 
     // ===== FILTER =====
-    sx = px + 773;
+    sx = px + 780;
     placeKnob(filtCutoff, sx, row1);
     placeKnob(filtReso, sx + KW, row1);
     placeKnob(filtEnvAmt, sx, row1 + KH + 4);
@@ -558,7 +572,7 @@ void UltimateProphetEditor::resized()
     filtRev.box.setBounds(sx + KW, row1 + 2 * KH + 24, KW - 4, 22);
 
     // ===== MASTER =====
-    sx = px + 927;
+    sx = px + 942;
     placeKnob(masterVol, sx, row1);
     placeKnob(vintage, sx, row1 + KH + 4);
     placeKnob(pitchRange, sx, row1 + 2 * (KH + 4));
