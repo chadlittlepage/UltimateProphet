@@ -464,13 +464,34 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
         }
         else
         {
-            int voiceIdx = findFreeVoice();
+            // Prophet-5 behavior: "if you repeatedly hit the same key,
+            // it will not cycle through voices; it will retrigger the same voice"
+            int voiceIdx = -1;
+            bool retrigger = false;
+
+            // First: check if any voice is already playing this note
+            for (int i = 0; i < NUM_VOICES; ++i)
+            {
+                if (voices[i].getCurrentNote() == note && voices[i].isActive())
+                {
+                    voiceIdx = i;
+                    retrigger = true;
+                    break;
+                }
+            }
+
+            // If not retriggering, find a free voice or steal
             bool stolen = false;
-            if (voiceIdx < 0) { voiceIdx = findVoiceToSteal(); stolen = true; }
+            if (voiceIdx < 0)
+            {
+                voiceIdx = findFreeVoice();
+                if (voiceIdx < 0) { voiceIdx = findVoiceToSteal(); stolen = true; }
+            }
+
             voices[voiceIdx].noteOn(note, vel, ++noteCounter);
             debugConsole.log("[MIDI] NoteOn %s%d vel=%.2f -> voice %d%s",
                              midiNoteName(note), (note / 12) - 1, vel, voiceIdx + 1,
-                             stolen ? " (STOLEN)" : "");
+                             retrigger ? " (RETRIG)" : stolen ? " (STOLEN)" : "");
         }
     }
     else if (msg.isNoteOff())
