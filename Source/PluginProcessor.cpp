@@ -15,47 +15,6 @@ UltimateProphetProcessor::UltimateProphetProcessor()
       apvts(*this, nullptr, "Parameters", createParameterLayout())
 {
     debugConsole.log("[INIT] UltimateProphet v0.3.0 — Prophet-5 Compatible");
-
-    // Auto-load factory patches if found
-    auto exePath = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
-    auto appBundle = exePath.getParentDirectory().getParentDirectory().getParentDirectory();
-
-    juce::StringArray searchPaths = {
-        // Direct path (development)
-        "/Users/chadlittlepage/Documents/APPs/UltimateProphet/Patches",
-        // Relative to app bundle (standalone)
-        appBundle.getChildFile("Patches").getFullPathName(),
-        // Up from build artifacts to project root
-        appBundle.getParentDirectory().getParentDirectory().getParentDirectory()
-            .getParentDirectory().getParentDirectory().getChildFile("Patches").getFullPathName(),
-        // Relative to exe
-        exePath.getParentDirectory().getChildFile("Patches").getFullPathName(),
-        // Next to the .app
-        appBundle.getParentDirectory().getChildFile("Patches").getFullPathName(),
-        // Home directory
-        juce::File::getSpecialLocation(juce::File::userHomeDirectory)
-            .getChildFile("Documents/APPs/UltimateProphet/Patches").getFullPathName(),
-    };
-
-    bool foundPatches = false;
-    for (auto& path : searchPaths)
-    {
-        juce::File factoryFile(path + "/P5_Factory_Programs_FACTORY_v1.03.syx");
-        debugConsole.log("[INIT] Trying: %s -> %s",
-                         path.toRawUTF8(),
-                         factoryFile.existsAsFile() ? "FOUND" : "not found");
-        if (factoryFile.existsAsFile())
-        {
-            loadSysExFile(factoryFile);
-            foundPatches = true;
-            break;
-        }
-    }
-    if (!foundPatches)
-        debugConsole.log("[INIT] No factory patches found - use Load .syx");
-
-    // Load user patches (appear after factory in the patch list)
-    loadUserPatches();
 }
 
 UltimateProphetProcessor::~UltimateProphetProcessor() {}
@@ -210,6 +169,38 @@ UltimateProphetProcessor::createParameterLayout()
     return { p.begin(), p.end() };
 }
 
+void UltimateProphetProcessor::loadFactoryPatchesIfNeeded()
+{
+    if (patchesLoaded) return;
+    patchesLoaded = true;
+
+    auto exePath = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+    auto appBundle = exePath.getParentDirectory().getParentDirectory().getParentDirectory();
+
+    juce::StringArray searchPaths = {
+        "/Users/chadlittlepage/Documents/APPs/UltimateProphet/Patches",
+        appBundle.getChildFile("Patches").getFullPathName(),
+        appBundle.getParentDirectory().getParentDirectory().getParentDirectory()
+            .getParentDirectory().getParentDirectory().getChildFile("Patches").getFullPathName(),
+        exePath.getParentDirectory().getChildFile("Patches").getFullPathName(),
+        appBundle.getParentDirectory().getChildFile("Patches").getFullPathName(),
+        juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+            .getChildFile("Documents/APPs/UltimateProphet/Patches").getFullPathName(),
+    };
+
+    for (auto& path : searchPaths)
+    {
+        juce::File factoryFile(path + "/P5_Factory_Programs_FACTORY_v1.03.syx");
+        if (factoryFile.existsAsFile())
+        {
+            loadSysExFile(factoryFile);
+            break;
+        }
+    }
+
+    loadUserPatches();
+}
+
 void UltimateProphetProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     lastSampleRate = sampleRate;
@@ -230,6 +221,9 @@ void UltimateProphetProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     debugConsole.oversampleFactor.store(Prophet5Voice::OVERSAMPLE_FACTOR);
     debugConsole.log("[AUDIO] prepareToPlay: %.0f Hz, %d smp, %dx OS",
                      sampleRate, samplesPerBlock, Prophet5Voice::OVERSAMPLE_FACTOR);
+
+    // Load factory patches on first prepare (not in constructor — avoids DAW scan flicker)
+    loadFactoryPatchesIfNeeded();
 }
 
 void UltimateProphetProcessor::releaseResources() {}

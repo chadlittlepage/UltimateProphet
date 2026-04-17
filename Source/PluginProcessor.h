@@ -121,6 +121,8 @@ private:
 
     double lastSampleRate = 44100.0;
     int lastBlockSize = 512;
+    bool patchesLoaded = false;
+    void loadFactoryPatchesIfNeeded();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(UltimateProphetProcessor)
 };
