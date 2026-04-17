@@ -939,6 +939,12 @@ void UltimateProphetProcessor::saveUserPatch(const juce::String& name)
     xml->setAttribute("userBank", userBank);
     xml->setAttribute("userSlot", userSlot);
 
+    // Save chord memory
+    xml->setAttribute("chordMemoryActive", chordMemoryActive ? 1 : 0);
+    xml->setAttribute("chordNoteCount", chordNoteCount);
+    for (int i = 0; i < chordNoteCount; ++i)
+        xml->setAttribute("chordInterval" + juce::String(i), chordIntervals[i]);
+
     juce::String filename = juce::String(userPatchCount).paddedLeft('0', 3) + "_" + name + ".xml";
     // Clean filename
     filename = filename.replaceCharacters(" /\\:*?\"<>|", "___________");
@@ -1007,12 +1013,14 @@ void UltimateProphetProcessor::selectPatch(int index)
 
     if (index < FACTORY_PATCH_COUNT)
     {
-        // Factory patch: load from SysEx data
+        // Factory patch: load from SysEx data, clear chord memory
         SysExLoader::applyPatchToAPVTS(loadedPatches[static_cast<size_t>(index)], apvts);
+        chordMemoryActive = false;
+        chordNoteCount = 0;
     }
     else
     {
-        // User patch: load from XML file
+        // User patch: load from XML file + restore chord memory
         auto dir = getUserPatchDir();
         auto files = dir.findChildFiles(juce::File::findFiles, false, "*.xml");
         files.sort();
@@ -1025,6 +1033,15 @@ void UltimateProphetProcessor::selectPatch(int index)
                 auto tree = juce::ValueTree::fromXml(*xml);
                 if (tree.isValid())
                     apvts.replaceState(tree);
+
+                // Restore chord memory from XML attributes
+                chordMemoryActive = xml->getIntAttribute("chordMemoryActive", 0) > 0;
+                chordNoteCount = xml->getIntAttribute("chordNoteCount", 0);
+                for (int i = 0; i < chordNoteCount; ++i)
+                    chordIntervals[i] = xml->getIntAttribute("chordInterval" + juce::String(i), 0);
+
+                if (chordMemoryActive)
+                    debugConsole.log("[PATCH] Chord memory restored (%d notes)", chordNoteCount);
             }
         }
     }
