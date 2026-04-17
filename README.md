@@ -124,4 +124,10 @@ A S D F G H J K L ;       (white keys)
 
 ## License
 
-Proprietary. Copyright (c) 2026 CELL DIVISION / Kings of Confetti. All rights reserved. Source code is viewable for educational purposes only. See [LICENSE](LICENSE) for details.
+**Copyright (c) 2026 CELL DIVISION / Kings of Confetti. All rights reserved.**
+
+This source code is provided for viewing and educational purposes only. You may not copy, modify, distribute, or commercially exploit this software or any portion of it without written permission. Compiled releases are available for personal, non-commercial use.
+
+For licensing inquiries: chad.littlepage@gmail.com
+
+See [LICENSE](LICENSE) for full terms.
