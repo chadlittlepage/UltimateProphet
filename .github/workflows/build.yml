@@ -1,0 +1,95 @@
+name: Build UltimateProphet
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone JUCE
+        run: git clone --depth 1 https://github.com/juce-framework/JUCE.git ../JUCE
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build VST3
+        run: cmake --build build --config Release --target UltimateProphet_VST3 -j
+
+      - name: Upload Windows VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltimateProphet-Windows-VST3
+          path: build/UltimateProphet_artefacts/Release/VST3/UltimateProphet.vst3/
+          retention-days: 90
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone JUCE
+        run: git clone --depth 1 https://github.com/juce-framework/JUCE.git ../JUCE
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build All Formats
+        run: cmake --build build --config Release -j
+
+      - name: Upload Mac VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltimateProphet-Mac-VST3
+          path: build/UltimateProphet_artefacts/Release/VST3/UltimateProphet.vst3/
+          retention-days: 90
+
+      - name: Upload Mac AU
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltimateProphet-Mac-AU
+          path: build/UltimateProphet_artefacts/Release/AU/UltimateProphet.component/
+          retention-days: 90
+
+      - name: Upload Mac Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltimateProphet-Mac-Standalone
+          path: build/UltimateProphet_artefacts/Release/Standalone/UltimateProphet.app/
+          retention-days: 90
+
+  release:
+    needs: [build-windows, build-mac]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create ZIP archives
+        run: |
+          cd artifacts
+          zip -r ../UltimateProphet-Windows-VST3.zip UltimateProphet-Windows-VST3/
+          zip -r ../UltimateProphet-Mac-VST3.zip UltimateProphet-Mac-VST3/
+          zip -r ../UltimateProphet-Mac-AU.zip UltimateProphet-Mac-AU/
+          zip -r ../UltimateProphet-Mac-Standalone.zip UltimateProphet-Mac-Standalone/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          files: |
+            UltimateProphet-Windows-VST3.zip
+            UltimateProphet-Mac-VST3.zip
+            UltimateProphet-Mac-AU.zip
+            UltimateProphet-Mac-Standalone.zip
+          draft: false
+          prerelease: true
