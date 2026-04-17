@@ -385,7 +385,10 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         for (int vi = 0; vi < NUM_VOICES; ++vi)
         {
             auto& voice = voices[vi];
-            voice.params.unisonDetuneSemitones = unisonActive ? voiceDetuneOffset[vi] : 0.0f;
+            // Chord memory: no detune (each voice has its own note from the chord)
+            // Normal unison: apply detune spread
+            voice.params.unisonDetuneSemitones = (unisonActive && !chordMemoryActive)
+                ? voiceDetuneOffset[vi] : 0.0f;
             voice.params.oscASawOn = oscASaw;
             voice.params.oscAPulseOn = oscAPulse;
             voice.params.oscAFreqKnob = oscAFreq;
