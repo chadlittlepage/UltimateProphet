@@ -501,6 +501,12 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
         // Track held notes for priority logic
         heldNotes.push_back(note);
 
+        // Remember for chord memory (persists after release)
+        if (std::find(lastPlayedNotes.begin(), lastPlayedNotes.end(), note) == lastPlayedNotes.end())
+            lastPlayedNotes.push_back(note);
+        if (lastPlayedNotes.size() > 5)
+            lastPlayedNotes.erase(lastPlayedNotes.begin());
+
         if (unisonActive)
         {
             int uvc = juce::jlimit(1, NUM_VOICES,

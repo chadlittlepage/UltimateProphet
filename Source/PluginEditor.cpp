@@ -169,19 +169,16 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
         }
         else
         {
-            // Capture from processor's active voices — NOT heldKeys,
-            // because clicking this button steals keyboard focus and
-            // releases all QWERTY keys before onClick fires.
-            std::vector<int> notes;
-            for (int i = 0; i < UltimateProphetProcessor::NUM_VOICES; ++i)
-            {
-                int note = processorRef.debugConsole.voiceStats[i].note.load();
-                bool active = processorRef.debugConsole.voiceStats[i].active.load();
-                if (active && note >= 0)
-                    notes.push_back(note);
-            }
+            // Use the processor's lastPlayedNotes buffer — this persists
+            // after note-offs, so it works even though clicking this button
+            // steals keyboard focus and releases all notes.
+            std::vector<int> notes = processorRef.getLastPlayedNotes();
             if (!notes.empty())
             {
+                // Auto-enable unison (chord memory requires it)
+                if (auto* p = processorRef.getAPVTS().getParameter("unisonOn"))
+                    p->setValueNotifyingHost(1.0f);
+
                 processorRef.storeChordMemory(notes);
                 chordMemBtn.setButtonText("Chord*");
             }

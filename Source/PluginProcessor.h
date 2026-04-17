@@ -90,6 +90,12 @@ private:
     std::vector<int> heldNotes;
     int lastUnisonNote = -1;
 
+    // Last played notes (persists after release, for chord memory capture)
+    std::vector<int> lastPlayedNotes;
+public:
+    const std::vector<int>& getLastPlayedNotes() const { return lastPlayedNotes; }
+private:
+
     // LFO (shared across all voices)
     LFO lfo;
 
