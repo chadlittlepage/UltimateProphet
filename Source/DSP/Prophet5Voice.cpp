@@ -135,42 +135,19 @@ float Prophet5Voice::process()
     oscB.setFrequency(midiNoteToHz(oscBNote));
     oscB.setPulseWidth(params.oscBPulseWidth);
 
-    // CEM 3340: ALL waveforms derive from the same capacitor/phase.
-    // Process the saw core once to advance phase, then read the phase
-    // BEFORE it advances to compute all waveforms at the SAME position.
-    float phaseBefore = oscB.getPhase();
-    oscB.setWaveform(CEM3340Oscillator::Waveform::Saw);
-    float oscBSawVal = oscB.process();  // advances phase once
+    // CEM 3340: ONE capacitor generates the saw ramp.
+    // Triangle = wavefolder on saw. Pulse = comparator on saw.
+    // processAll() computes all three with full antialiasing from
+    // the same phase, advances phase exactly once.
+    auto oscBWaves = oscB.processAll();
 
-    // Compute all waveforms from phaseBefore (perfect phase alignment)
     float oscBOut = 0.0f;
     int oscBWaveCount = 0;
-
-    if (params.oscBSawOn)
-    {
-        oscBOut += oscBSawVal;
-        oscBWaveCount++;
-    }
-    if (params.oscBTriOn)
-    {
-        // Triangle from the same phase (wavefolder on saw)
-        float tri = (phaseBefore < 0.5f)
-            ? (4.0f * phaseBefore - 1.0f)
-            : (3.0f - 4.0f * phaseBefore);
-        oscBOut += tri;
-        oscBWaveCount++;
-    }
-    if (params.oscBPulseOn)
-    {
-        // Pulse from the same phase (comparator on saw)
-        float pulse = (phaseBefore < params.oscBPulseWidth) ? 1.0f : -1.0f;
-        oscBOut += pulse;
-        oscBWaveCount++;
-    }
+    if (params.oscBSawOn)   { oscBOut += oscBWaves.saw;      oscBWaveCount++; }
+    if (params.oscBTriOn)   { oscBOut += oscBWaves.triangle;  oscBWaveCount++; }
+    if (params.oscBPulseOn) { oscBOut += oscBWaves.pulse;     oscBWaveCount++; }
     if (oscBWaveCount > 1)
         oscBOut /= static_cast<float>(oscBWaveCount);
-    if (oscBWaveCount == 0)
-        oscBOut = 0.0f;
 
     // --- Poly-Mod computation ---
     float polyModSignal = params.polyModFiltEnvAmt * filterEnvVal
@@ -217,32 +194,15 @@ float Prophet5Voice::process()
         oscA.hardSync(residual);
     }
 
-    // CEM 3340: ALL waveforms from the same phase (same capacitor)
-    float phaseABefore = oscA.getPhase();
-    oscA.setWaveform(CEM3340Oscillator::Waveform::Saw);
-    float oscASawVal = oscA.process();  // advances phase once
+    // CEM 3340: same capacitor, same phase, all waveforms antialiased
+    auto oscAWaves = oscA.processAll();
 
     float oscAOut = 0.0f;
     int oscAWaveCount = 0;
-    float effectivePW = juce::jlimit(0.05f, 0.95f,
-        params.oscAPulseWidth + oscAPWMod);
-
-    if (params.oscASawOn)
-    {
-        oscAOut += oscASawVal;
-        oscAWaveCount++;
-    }
-    if (params.oscAPulseOn)
-    {
-        // Pulse from the same phase (comparator on saw)
-        float pulse = (phaseABefore < effectivePW) ? 1.0f : -1.0f;
-        oscAOut += pulse;
-        oscAWaveCount++;
-    }
+    if (params.oscASawOn)   { oscAOut += oscAWaves.saw;   oscAWaveCount++; }
+    if (params.oscAPulseOn) { oscAOut += oscAWaves.pulse;  oscAWaveCount++; }
     if (oscAWaveCount > 1)
         oscAOut /= static_cast<float>(oscAWaveCount);
-    if (oscAWaveCount == 0)
-        oscAOut = 0.0f;
 
     // --- Mixer ---
     float mixedSignal = oscAOut * params.oscALevel

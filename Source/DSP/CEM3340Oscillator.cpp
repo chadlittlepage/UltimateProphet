@@ -48,43 +48,56 @@ void CEM3340Oscillator::hardSync()
 
 float CEM3340Oscillator::process()
 {
-    // Generate the saw core (all waveforms derive from this)
-    float sawOut = processSawCore();
+    auto all = processAll();
 
     float output = 0.0f;
     switch (waveform)
     {
-        case Waveform::Saw:
-            output = sawOut;
-            break;
-        case Waveform::Pulse:
-            output = processPulseFromSaw(sawOut);
-            break;
-        case Waveform::Triangle:
-            output = processTriangleFromSaw(sawOut);
-            break;
+        case Waveform::Saw:      output = all.saw; break;
+        case Waveform::Pulse:    output = all.pulse; break;
+        case Waveform::Triangle: output = all.triangle; break;
     }
 
+    return output;
+}
+
+CEM3340Oscillator::AllWaveforms CEM3340Oscillator::processAll()
+{
+    AllWaveforms out;
+
+    // The CEM 3340 has ONE capacitor that generates the saw ramp.
+    // Triangle is derived via a wavefolder on the saw.
+    // Pulse is derived via a comparator on the saw.
+    // All three are physically from the same signal, in perfect phase.
+
+    float sawOut = processSawCore();
+    out.saw = sawOut;
+    out.pulse = processPulseFromSaw(sawOut);
+    out.triangle = processTriangleFromSaw(sawOut);
+
     // Natural analog bandwidth limiting (one-pole LPF ~18kHz)
-    lpState += lpCoeff * (output - lpState);
-    output = lpState;
+    // Apply to saw (primary output); pulse and triangle get their
+    // own implicit filtering from the antialiasing
+    lpState += lpCoeff * (out.saw - lpState);
+    out.saw = lpState;
 
     // Save phase before advancing for wrap/sync detection
     previousPhase = phase;
 
-    // Advance phase
+    // Advance phase (ONCE for all waveforms)
     phase += phaseIncrement;
     wrapped = false;
     if (phase >= 1.0f)
     {
         wrapped = true;
-        // Calculate fractional position within the sample where wrap occurred
-        // (for sub-sample sync accuracy in the slave oscillator)
-        wrapFraction = (phase - 1.0f) / phaseIncrement;
+        if (phaseIncrement > 1e-10f)
+            wrapFraction = (phase - 1.0f) / phaseIncrement;
+        else
+            wrapFraction = 0.0f;
         phase -= 1.0f;
     }
 
-    return output;
+    return out;
 }
 
 // ============================================================

@@ -45,6 +45,17 @@ public:
 
     float process();
 
+    // Process all waveforms simultaneously from the same phase.
+    // The real CEM 3340 derives saw, triangle, and pulse from
+    // the same capacitor — they are always in perfect phase.
+    // Phase advances only once. All outputs are antialiased.
+    struct AllWaveforms {
+        float saw = 0.0f;
+        float triangle = 0.0f;
+        float pulse = 0.0f;
+    };
+    AllWaveforms processAll();
+
     // Phase state for sync detection
     float getPhase() const { return phase; }
     float getPreviousPhase() const { return previousPhase; }
