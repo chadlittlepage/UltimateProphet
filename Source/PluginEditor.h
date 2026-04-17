@@ -88,7 +88,7 @@ private:
     Knob ampAtk, ampDec, ampSus, ampRel;
 
     // Performance
-    Knob glideRate, vintage, pitchRange, masterVol, masterTune, unisonVoices;
+    Knob glideRate, vintage, pitchRange, masterVol, masterTune, unisonVoices, unisonDetune;
     Toggle glideOn, unisonOn, velFilt, velAmp, releaseSwitch, atFilter, atLFO;
     Combo keyPriority;
     juce::TextButton chordMemBtn{"Chord"};

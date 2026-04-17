@@ -142,6 +142,7 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
     setupKnob(pitchRange, "pitchWheelRange", "PB Rng");
     setupToggle(unisonOn, "unisonOn", "Unison");
     setupKnob(unisonVoices, "unisonVoices", "Uni Vox");
+    setupKnob(unisonDetune, "unisonDetune", "Uni Det");
     setupToggle(velFilt, "velToFilter", "V>Filt");
     setupToggle(velAmp, "velToAmp", "V>Amp");
     setupToggle(releaseSwitch, "releaseSwitch", "Release");
@@ -577,6 +578,7 @@ void UltimateProphetEditor::resized()
     placeKnob(glideRate, sx, row2);
     placeKnob(masterTune, sx + KW, row2);
     placeKnob(unisonVoices, sx + KW * 2, row2);
+    placeKnob(unisonDetune, sx + KW * 3, row2);
 
     int perfTogY = row2 + KH + 4;
     placeToggle(glideOn, sx, perfTogY);

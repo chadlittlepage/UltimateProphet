@@ -262,6 +262,7 @@ void SysExLoader::applyPatchToAPVTS(const Patch& patch,
     setBool ("lfoToPWA",    p[LFO_PW_A] > 0);
     setBool ("lfoToPWB",    p[LFO_PW_B] > 0);
     setBool ("lfoToFilter", p[LFO_FILTER] > 0);
+    setFloat("lfoSrcMix",  nrpnToLevel(p[LFO_SOURCE_MIX]));
 
     // Poly-Mod
     setFloat("pmodFiltEnv", nrpnToLevel(p[PMOD_FILT_ENV]));  // 0-127 but treat as level
@@ -294,12 +295,19 @@ void SysExLoader::applyPatchToAPVTS(const Patch& patch,
     setFloat("ampSus", nrpnToSustain(p[SUSTAIN_VCA]));
     setFloat("ampRel", nrpnToEnvTime(p[RELEASE_VCA]));
 
-    // Glide
+    // Release switch
+    setBool("releaseSwitch", p[RELEASE_SWITCH] > 0);
+
+    // Glide (Prophet-5: glide is always "on" when rate > 0)
     setFloat("glideRate", nrpnToGlideRate(p[GLIDE_RATE]));
     setBool ("glideOn",   p[GLIDE_RATE] > 0);
 
     // Unison
     setBool ("unisonOn", p[UNISON_ON] > 0);
+    setFloat("unisonVoices", static_cast<float>(juce::jlimit(1, 5,
+        p[UNISON_VOICES] > 0 ? static_cast<int>(p[UNISON_VOICES]) : 5)));
+    setFloat("unisonDetune", static_cast<float>(juce::jlimit(0, 7,
+        static_cast<int>(p[UNISON_DETUNE]))) / 7.0f);
 
     // Pitch wheel range
     setFloat("pitchWheelRange", static_cast<float>(juce::jlimit(1, 12, (int)p[PITCH_WHEEL_RANGE] + 1)));

@@ -49,6 +49,7 @@ float LFO::process()
 
     if (activeCount > 1)
         lfoOut /= static_cast<float>(activeCount);
+    // If no waveforms active, output is 0 (not NaN)
 
     // --- Pink noise (Voss-McCartney approximation) ---
     float white = noiseRng.nextFloat() * 2.0f - 1.0f;
