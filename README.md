@@ -6,7 +6,7 @@
 
 A circuit-level recreation of the Sequential Prophet-5, featuring both the Rev 1/2 (SSM 2040) and Rev 3 (CEM 3320) filter designs, genuine CEM 3340 oscillator modeling, CEM 3310 envelope generators, and full SysEx patch compatibility with the real hardware.
 
-*By Kings of Confetti*
+*By CELL DIVISION / Kings of Confetti*
 
 ## Features
 
