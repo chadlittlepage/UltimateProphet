@@ -114,5 +114,11 @@ private:
     static constexpr int WOOD = 28;
     static constexpr int SYNTH_H = 500;
 
+    // Resizable scaling
+    static constexpr int DEFAULT_W = 1150;
+    static constexpr int DEFAULT_H = 500 + DebugConsolePanel::EXPANDED_HEIGHT;
+    float scaleFactor = 1.0f;
+    juce::ComponentBoundsConstrainer constrainer;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(UltimateProphetEditor)
 };

@@ -218,7 +218,14 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
 
     addAndMakeVisible(consolePanel);
     startTimerHz(30);
-    setSize(1150, SYNTH_H + DebugConsolePanel::EXPANDED_HEIGHT);
+
+    // Enable resizable with fixed aspect ratio
+    constrainer.setFixedAspectRatio(static_cast<double>(DEFAULT_W) / DEFAULT_H);
+    constrainer.setMinimumSize(DEFAULT_W / 2, DEFAULT_H / 2);
+    constrainer.setMaximumSize(DEFAULT_W * 2, DEFAULT_H * 2);
+    setConstrainer(&constrainer);
+    setResizable(true, true);  // resizable with corner dragger
+    setSize(DEFAULT_W, DEFAULT_H);
 
     // Refresh patch display (factory patches may have auto-loaded)
     updatePatchLabel();
@@ -396,22 +403,25 @@ void UltimateProphetEditor::paintSection(juce::Graphics& g, int x, int y, int w,
 
 void UltimateProphetEditor::paint(juce::Graphics& g)
 {
+    // Scale the graphics context to match child transforms
+    g.addTransform(juce::AffineTransform::scale(scaleFactor));
+
     g.fillAll(juce::Colour(0xff1A1A1E));
 
     // Wood panels
     auto wood = juce::Colour(0xff2C1810);
     g.setColour(wood);
     g.fillRect(0, 0, WOOD, SYNTH_H);
-    g.fillRect(getWidth() - WOOD, 0, WOOD, SYNTH_H);
+    g.fillRect(DEFAULT_W - WOOD, 0, WOOD, SYNTH_H);
     g.setColour(wood.brighter(0.06f));
     for (int yy = 0; yy < SYNTH_H; yy += 5)
     {
         g.drawHorizontalLine(yy, 2.0f, (float)(WOOD - 2));
-        g.drawHorizontalLine(yy, (float)(getWidth() - WOOD + 2), (float)(getWidth() - 2));
+        g.drawHorizontalLine(yy, (float)(DEFAULT_W - WOOD + 2), (float)(DEFAULT_W - 2));
     }
 
     int px = WOOD + 4;
-    int pw = getWidth() - 2 * (WOOD + 4);
+    int pw = DEFAULT_W - 2 * (WOOD + 4);
 
     // Header
     g.setColour(juce::Colour(0xffD4A843));
@@ -451,10 +461,28 @@ void UltimateProphetEditor::paint(juce::Graphics& g)
 
 void UltimateProphetEditor::resized()
 {
-    int px = WOOD + 10;
-    int row1 = 42;  // first row of knobs in each section
+    // Compute scale factor from current size vs default
+    scaleFactor = static_cast<float>(getWidth()) / static_cast<float>(DEFAULT_W);
 
-    // Helper lambdas
+    // Apply transform to scale all child components
+    auto transform = juce::AffineTransform::scale(scaleFactor);
+    for (auto* child : getChildren())
+    {
+        if (child != &consolePanel)  // console stays at bottom, full width
+            child->setTransform(transform);
+    }
+
+    // Console at bottom, unscaled (it has its own layout)
+    int consoleH = consolePanel.isConsoleVisible()
+                 ? DebugConsolePanel::EXPANDED_HEIGHT
+                 : DebugConsolePanel::COLLAPSED_HEIGHT;
+    consolePanel.setTransform({});
+    consolePanel.setBounds(0, getHeight() - consoleH, getWidth(), consoleH);
+
+    // Layout everything at DEFAULT coordinates (transform handles scaling)
+    int px = WOOD + 10;
+    int row1 = 42;
+
     auto placeKnob = [&](Knob& k, int x, int y) {
         k.label.setBounds(x, y, KW, 12);
         k.slider.setBounds(x, y + 12, KW - 4, KW);
@@ -564,20 +592,10 @@ void UltimateProphetEditor::resized()
 
     statusLabel.setBounds(sx, perfTogY + 3 * TH + 30, 200, 16);
 
-    // Patch browser: top center LCD display
-    int lcdX = px + (getWidth() - 2 * (WOOD + 4) - 400) / 2;
+    // Patch browser: top center LCD display (at default coordinates)
+    int lcdX = px + (DEFAULT_W - 2 * (WOOD + 4) - 400) / 2;
     loadSyxButton.setBounds(lcdX, 2, 56, 20);
     prevPatchButton.setBounds(lcdX + 58, 2, 24, 20);
     nextPatchButton.setBounds(lcdX + 84, 2, 24, 20);
     patchNameLabel.setBounds(lcdX + 112, 2, 284, 20);
-
-    // Console
-    int consoleH = consolePanel.isConsoleVisible()
-                 ? DebugConsolePanel::EXPANDED_HEIGHT
-                 : DebugConsolePanel::COLLAPSED_HEIGHT;
-    consolePanel.setBounds(0, getHeight() - consoleH, getWidth(), consoleH);
-
-    int totalH = SYNTH_H + consoleH;
-    if (getHeight() != totalH)
-        setSize(getWidth(), totalH);
 }
