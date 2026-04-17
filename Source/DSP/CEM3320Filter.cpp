@@ -1,4 +1,5 @@
 #include "CEM3320Filter.h"
+#include "FastMath.h"
 
 void CEM3320Filter::prepare(double sr, int oversamplingFactor)
 {
@@ -94,7 +95,7 @@ float CEM3320Filter::process(float input)
     {
         // CEM 3320 OTA: differential input, then saturate
         float diff = out - stage[i];
-        float saturatedDiff = CELL_GAIN * std::tanh(diff / Vt) * Vt;
+        float saturatedDiff = CELL_GAIN * FastMath::tanh(diff / Vt) * Vt;
 
         // Clamp to max cell gain (3.0x from datasheet)
         float maxOut = MAX_CELL_GAIN * std::abs(diff);

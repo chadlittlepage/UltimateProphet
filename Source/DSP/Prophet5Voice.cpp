@@ -115,7 +115,7 @@ float Prophet5Voice::process()
                    + driftSmoothA;
 
     // Osc B: freq knob offset + fine tune + optional keyboard + pitch bend + drift
-    float oscBNote;
+    float oscBNote = 60.0f;
     if (params.oscBLowFreq)
     {
         // Low Freq mode: fixed low frequency based on knob only, no keyboard

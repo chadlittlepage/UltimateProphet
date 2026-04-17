@@ -1,4 +1,5 @@
 #include "SSM2040Filter.h"
+#include "FastMath.h"
 
 void SSM2040Filter::prepare(double sr, int oversamplingFactor)
 {
@@ -50,7 +51,7 @@ float SSM2040Filter::process(float input)
     // Feedback signal through the SSM 2020 VCA
     float rawFeedback = lastOutput;
     // SSM 2020 soft saturation (Vt=2.5 — wider linear range than CEM)
-    float saturatedFb = std::tanh(rawFeedback * 0.4f) * 2.5f;
+    float saturatedFb = FastMath::tanh(rawFeedback * 0.4f) * 2.5f;
     // VCA bandwidth limiting (smooths the feedback, prevents harshness)
     fbVcaState += FB_VCA_SLEW * (saturatedFb - fbVcaState);
     float feedback = fbVcaState;
@@ -80,8 +81,8 @@ float SSM2040Filter::process(float input)
     for (int i = 0; i < 4; ++i)
     {
         // SSM/Moog-style: saturate each side independently
-        float tanhIn    = std::tanh(out      / Vt) * Vt;
-        float tanhState = std::tanh(stage[i] / Vt) * Vt;
+        float tanhIn    = FastMath::tanh(out      / Vt) * Vt;
+        float tanhState = FastMath::tanh(stage[i] / Vt) * Vt;
         float v = G * (tanhIn - tanhState);
         out = v + stage[i];       // OUTPUT
         stage[i] = out + v;       // STATE (trapezoidal)

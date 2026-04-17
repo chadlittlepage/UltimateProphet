@@ -28,9 +28,7 @@ target_sources(UltimateProphet
         Source/DSP/CEM3340Oscillator.cpp
         Source/DSP/CEM3320Filter.cpp
         Source/DSP/CEM3310Envelope.cpp
-        Source/DSP/PolyModMatrix.cpp
         Source/DSP/Prophet5Voice.cpp
-        Source/DSP/Oversampling.cpp
         Source/DSP/SSM2040Filter.cpp
         Source/DSP/LFO.cpp
         Source/SysExLoader.cpp
