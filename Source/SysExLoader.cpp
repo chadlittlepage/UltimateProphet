@@ -311,4 +311,8 @@ void SysExLoader::applyPatchToAPVTS(const Patch& patch,
 
     // Pitch wheel range
     setFloat("pitchWheelRange", static_cast<float>(juce::jlimit(1, 12, (int)p[PITCH_WHEEL_RANGE] + 1)));
+
+    // Key priority / retrigger mode (NRPN 87): 0=Low, 1=LowRetrig, 2=Last, 3=LastRetrig
+    if (auto* param = apvts.getParameter("keyPriority"))
+        param->setValueNotifyingHost(static_cast<float>(juce::jlimit(0, 3, (int)p[RETRIGGER_UNISON])) / 3.0f);
 }
