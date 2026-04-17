@@ -236,25 +236,34 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
 
     // Save button — saves current settings as user patch
     saveButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2A2A2E));
-    saveButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xff40FF40));
+    saveButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffD4A843));
     saveButton.onClick = [this] {
-        auto dlg = std::make_shared<juce::AlertWindow>(
-            "Save User Patch", "Enter a name for this patch:", juce::MessageBoxIconType::NoIcon);
-        dlg->addTextEditor("name", "My Patch", "Patch Name:");
-        dlg->addButton("Save", 1);
-        dlg->addButton("Cancel", 0);
-        dlg->enterModalState(true, juce::ModalCallbackFunction::create(
-            [this, dlg](int result) {
-                if (result == 1)
+        // Default name: current patch name + " 01"
+        juce::String defaultName = "My Patch";
+        int idx = processorRef.currentPatchIndex;
+        if (idx >= 0 && idx < processorRef.getNumLoadedPatches())
+        {
+            juce::String currentName = processorRef.getPatchName(idx);
+            if (currentName.isNotEmpty())
+                defaultName = currentName + " 01";
+        }
+
+        // Use file save dialog instead of AlertWindow (no crash risk)
+        auto chooser = std::make_shared<juce::FileChooser>(
+            "Save User Patch",
+            processorRef.getUserPatchDir().getChildFile(defaultName + ".xml"),
+            "*.xml");
+        chooser->launchAsync(juce::FileBrowserComponent::saveMode
+                           | juce::FileBrowserComponent::canSelectFiles,
+            [this, chooser](const juce::FileChooser& fc) {
+                auto file = fc.getResult();
+                if (file != juce::File{})
                 {
-                    auto name = dlg->getTextEditorContents("name");
-                    if (name.isNotEmpty())
-                    {
-                        processorRef.saveUserPatch(name);
-                        updatePatchLabel();
-                    }
+                    juce::String name = file.getFileNameWithoutExtension();
+                    processorRef.saveUserPatch(name);
+                    updatePatchLabel();
                 }
-            }), true);
+            });
     };
     addAndMakeVisible(saveButton);
 
