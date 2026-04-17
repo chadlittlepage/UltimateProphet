@@ -1,5 +1,4 @@
 #include "SSM2040Filter.h"
-#include "FastMath.h"
 
 void SSM2040Filter::prepare(double sr, int oversamplingFactor)
 {
@@ -20,59 +19,65 @@ void SSM2040Filter::setResonance(float r)
 
 void SSM2040Filter::reset()
 {
-    for (auto& s : stage) s = 0.0f;
+    for (auto& s : stage)
+        s = 0.0f;
     lastOutput = 0.0f;
-    fbVcaState = 0.0f;
 }
 
 float SSM2040Filter::process(float input)
 {
-    // --- TPT coefficient ---
+    // TPT coefficient
     float g = std::tan(juce::MathConstants<float>::pi * cutoffHz
             / static_cast<float>(sampleRate));
     float G = g / (1.0f + g);
 
+    // Resonance: 0-1 maps to k = 0..4.0
     float k = resonance * 4.0f;
 
-    // --- SSM 2020 Resonance Feedback VCA ---
-    // Soft saturation + bandwidth limiting on the feedback signal
-    // lastOutput is at INTERNAL level (not amplified)
-    float saturatedFb = FastMath::tanh(lastOutput * 0.4f) * 2.5f;
-    fbVcaState += FB_VCA_SLEW * (saturatedFb - fbVcaState);
-    float feedback = fbVcaState;
+    // --- SSM 2040 Resonance Feedback ---
+    // The SSM 2040 uses an EXTERNAL VCA (SSM 2020) for feedback.
+    // The VCA has its own soft saturation characteristic, which is
+    // softer/rounder than the CEM 3320's direct feedback.
+    // Model: the feedback signal passes through a gentle tanh with
+    // higher headroom (Vt=2.0), giving the "liquidy" quality.
+    float fbSignal = std::tanh(lastOutput * 0.4f) * 2.5f;
 
-    // Gain compensation
-    float compensation = 1.0f + k * 0.4f;
+    // Gain compensation (moderate — SSM 2040 loses less bass than CEM 3320)
+    float u = input * (1.0f + k * 0.5f) - k * fbSignal;
 
-    // Input attenuation + compensation - feedback
-    float u = input * INPUT_ATTEN * compensation - k * feedback;
-
-    // --- SSM 2040 OTA Ladder: tanh(V+) - tanh(V-) ---
+    // --- SSM 2040 / Moog-style OTA Ladder ---
+    // Each stage uses: tanh(V+) - tanh(V-)
+    // This means each input is clipped INDEPENDENTLY before the
+    // difference is taken. This produces warmer, rounder saturation
+    // with more even harmonics than the CEM 3320's tanh(V+ - V-).
+    //
+    // In the TPT framework:
+    //   v = G * (tanh(input/Vt)*Vt - tanh(state/Vt)*Vt)
+    //   output = v + state
+    //   state = output + v
     static constexpr float Vt = 1.8f;
 
     float out = u;
     for (int i = 0; i < 4; ++i)
     {
-        float tanhIn    = FastMath::tanh(out      / Vt) * Vt;
-        float tanhState = FastMath::tanh(stage[i] / Vt) * Vt;
+        // Moog-style: clip each side independently
+        float tanhIn    = std::tanh(out      / Vt) * Vt;
+        float tanhState = std::tanh(stage[i] / Vt) * Vt;
         float v = G * (tanhIn - tanhState);
-        out = v + stage[i];
-        stage[i] = out + v;
-
-        out = juce::jlimit(-CLIP_LEVEL, CLIP_LEVEL, out);
+        out = v + stage[i];       // OUTPUT
+        stage[i] = out + v;       // STATE (trapezoidal)
     }
 
-    // Store at INTERNAL level for feedback
     lastOutput = out;
-
-    // Scale output back up
-    float finalOut = out / INPUT_ATTEN;
 
     // Denormal / NaN protection
     for (auto& s : stage)
-        if (!(s > -100.0f && s < 100.0f)) s = 0.0f;
-    if (!(fbVcaState > -100.0f && fbVcaState < 100.0f)) fbVcaState = 0.0f;
-    if (!(lastOutput > -100.0f && lastOutput < 100.0f)) lastOutput = 0.0f;
+    {
+        if (!(s > -100.0f && s < 100.0f))
+            s = 0.0f;
+    }
+    if (!(lastOutput > -100.0f && lastOutput < 100.0f))
+        lastOutput = 0.0f;
 
-    return finalOut;
+    return out;
 }
