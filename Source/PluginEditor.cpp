@@ -34,8 +34,16 @@ void UltimateProphetEditor::sendNoteOff(int n)
 void UltimateProphetEditor::setupKnob(Knob& k, const juce::String& id, const juce::String& name)
 {
     k.slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    k.slider.setTextBoxStyle(juce::Slider::TextBoxBelow, true, 200, 14);
-    k.slider.setNumDecimalPlacesToDisplay(4);
+    k.slider.setTextBoxStyle(juce::Slider::TextBoxBelow, true, KW + 10, 13);
+    // Custom text display: max 6 characters, no "..." ever
+    k.slider.textFromValueFunction = [](double val) -> juce::String {
+        if (std::abs(val) >= 10000.0)  return juce::String(static_cast<int>(val));
+        if (std::abs(val) >= 1000.0)   return juce::String(val, 0);
+        if (std::abs(val) >= 100.0)    return juce::String(val, 1);
+        if (std::abs(val) >= 10.0)     return juce::String(val, 1);
+        if (std::abs(val) >= 1.0)      return juce::String(val, 2);
+        return juce::String(val, 3);
+    };
     addAndMakeVisible(k.slider);
     k.label.setText(name, juce::dontSendNotification);
     k.label.setJustificationType(juce::Justification::centred);
