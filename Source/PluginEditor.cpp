@@ -147,6 +147,30 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
     setupToggle(releaseSwitch, "releaseSwitch", "Release");
     setupToggle(atFilter, "atToFilter", "AT>Filt");
     setupToggle(atLFO, "atToLFO", "AT>LFO");
+    setupCombo(keyPriority, "keyPriority", "Key Pri", {"Lo", "LoR", "Last", "LaR"});
+
+    chordMemBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2A2A2E));
+    chordMemBtn.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffD4A843));
+    chordMemBtn.onClick = [this] {
+        if (processorRef.isChordMemoryActive())
+        {
+            processorRef.clearChordMemory();
+            chordMemBtn.setButtonText("Chord");
+        }
+        else
+        {
+            // Store currently held QWERTY notes as chord
+            std::vector<int> notes;
+            for (auto& [key, midiNote] : heldKeys)
+                notes.push_back(midiNote);
+            if (!notes.empty())
+            {
+                processorRef.storeChordMemory(notes);
+                chordMemBtn.setButtonText("Chord*");
+            }
+        }
+    };
+    addAndMakeVisible(chordMemBtn);
 
     // Patch browser
     loadSyxButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2A2A2E));
@@ -534,7 +558,11 @@ void UltimateProphetEditor::resized()
     placeToggle(atFilter, sx + 136, perfTogY + TH + 4);
     placeToggle(atLFO, sx + 204, perfTogY + TH + 4);
 
-    statusLabel.setBounds(sx, perfTogY + 2 * TH + 12, 200, 16);
+    keyPriority.label.setBounds(sx, perfTogY + 2 * TH + 12, 60, 12);
+    keyPriority.box.setBounds(sx, perfTogY + 2 * TH + 24, 60, 20);
+    chordMemBtn.setBounds(sx + 68, perfTogY + 2 * TH + 20, 60, 24);
+
+    statusLabel.setBounds(sx, perfTogY + 3 * TH + 30, 200, 16);
 
     // Patch browser: top center LCD display
     int lcdX = px + (getWidth() - 2 * (WOOD + 4) - 400) / 2;

@@ -163,6 +163,9 @@ UltimateProphetProcessor::createParameterLayout()
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "unisonVoices", "Unison Voices",
         juce::NormalisableRange<float>(1.0f, 5.0f, 1.0f), 5.0f));
+    p.push_back(std::make_unique<juce::AudioParameterChoice>(
+        "keyPriority", "Key Priority",
+        juce::StringArray{"Low", "Low Retrig", "Last", "Last Retrig"}, 2));
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "vintage", "Vintage",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.05f));
@@ -465,29 +468,70 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
 void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
 {
+    keyPriorityMode = static_cast<int>(apvts.getRawParameterValue("keyPriority")->load());
+
     if (msg.isNoteOn())
     {
         int note = msg.getNoteNumber();
         float vel = msg.getFloatVelocity();
 
+        // Track held notes for priority logic
+        heldNotes.push_back(note);
+
         if (unisonActive)
         {
-            // Unison: trigger configured number of voices on the same note
             int uvc = juce::jlimit(1, NUM_VOICES,
                 static_cast<int>(apvts.getRawParameterValue("unisonVoices")->load()));
-            for (int i = 0; i < uvc; ++i)
-                voices[i].noteOn(note, vel, ++noteCounter);
-            debugConsole.log("[MIDI] NoteOn %s%d vel=%.2f -> UNISON (%d voices)",
-                             midiNoteName(note), (note / 12) - 1, vel, uvc);
+
+            // Key priority: determine which note to play
+            int playNote = note;
+            if (keyPriorityMode == 0 || keyPriorityMode == 1)  // Low / Low-retrig
+            {
+                playNote = *std::min_element(heldNotes.begin(), heldNotes.end());
+            }
+            // else Last / Last-retrig: use the note that was just pressed
+
+            // Should we retrigger envelopes?
+            bool shouldRetrigger = (keyPriorityMode == 1 || keyPriorityMode == 3);  // retrig modes
+            bool isNewNote = (playNote != lastUnisonNote);
+
+            if (isNewNote || shouldRetrigger)
+            {
+                if (chordMemoryActive && chordNoteCount > 0)
+                {
+                    // Chord memory: play the stored chord transposed to the new root
+                    for (int i = 0; i < juce::jmin(chordNoteCount, uvc); ++i)
+                    {
+                        int chordNote = juce::jlimit(0, 127, playNote + chordIntervals[i]);
+                        voices[i].noteOn(chordNote, vel, ++noteCounter);
+                    }
+                    debugConsole.log("[MIDI] NoteOn %s%d -> CHORD (%d notes)",
+                                     midiNoteName(playNote), (playNote / 12) - 1, chordNoteCount);
+                }
+                else
+                {
+                    // Normal unison: all voices on same note
+                    for (int i = 0; i < uvc; ++i)
+                        voices[i].noteOn(playNote, vel, ++noteCounter);
+                    debugConsole.log("[MIDI] NoteOn %s%d vel=%.2f -> UNISON (%d)",
+                                     midiNoteName(playNote), (playNote / 12) - 1, vel, uvc);
+                }
+                lastUnisonNote = playNote;
+            }
+            // In legato modes (Low, Last without retrig): note changes but envelopes continue
+            else if (!shouldRetrigger && isNewNote)
+            {
+                for (int i = 0; i < uvc; ++i)
+                    voices[i].noteOn(playNote, vel, ++noteCounter);
+                lastUnisonNote = playNote;
+            }
         }
         else
         {
-            // Prophet-5 behavior: "if you repeatedly hit the same key,
-            // it will not cycle through voices; it will retrigger the same voice"
+            // Polyphonic mode: same-note retrigger reuses same voice
             int voiceIdx = -1;
             bool retrigger = false;
 
-            // First: check if any voice is already playing this note
             for (int i = 0; i < NUM_VOICES; ++i)
             {
                 if (voices[i].getCurrentNote() == note && voices[i].isActive())
@@ -498,7 +542,6 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
                 }
             }
 
-            // If not retriggering, find a free voice or steal
             bool stolen = false;
             if (voiceIdx < 0)
             {
@@ -515,15 +558,42 @@ void UltimateProphetProcessor::handleMidiMessage(const juce::MidiMessage& msg)
     else if (msg.isNoteOff())
     {
         int note = msg.getNoteNumber();
+
+        // Remove from held notes
+        auto it = std::find(heldNotes.begin(), heldNotes.end(), note);
+        if (it != heldNotes.end())
+            heldNotes.erase(it);
+
         if (unisonActive)
         {
-            // Release all unison voices playing this note
-            int uvc = juce::jlimit(1, NUM_VOICES,
-                static_cast<int>(apvts.getRawParameterValue("unisonVoices")->load()));
-            for (int i = 0; i < uvc; ++i)
-                if (voices[i].getCurrentNote() == note && voices[i].isActive()
-                    && !voices[i].isInRelease())
-                    voices[i].noteOff();
+            // In unison with key priority, releasing a note might mean
+            // we should switch to a still-held note
+            if (!heldNotes.empty())
+            {
+                int uvc = juce::jlimit(1, NUM_VOICES,
+                    static_cast<int>(apvts.getRawParameterValue("unisonVoices")->load()));
+
+                int newNote;
+                if (keyPriorityMode == 0 || keyPriorityMode == 1)
+                    newNote = *std::min_element(heldNotes.begin(), heldNotes.end());
+                else
+                    newNote = heldNotes.back();
+
+                if (newNote != lastUnisonNote)
+                {
+                    for (int i = 0; i < uvc; ++i)
+                        voices[i].noteOn(newNote, 0.8f, ++noteCounter);
+                    lastUnisonNote = newNote;
+                }
+            }
+            else
+            {
+                // All keys released: release all voices
+                for (int i = 0; i < NUM_VOICES; ++i)
+                    if (voices[i].isActive() && !voices[i].isInRelease())
+                        voices[i].noteOff();
+                lastUnisonNote = -1;
+            }
         }
         else
         {
@@ -610,6 +680,37 @@ void UltimateProphetProcessor::setStateInformation(const void* data, int sizeInB
     std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
     if (xml && xml->hasTagName(apvts.state.getType()))
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
+}
+
+void UltimateProphetProcessor::storeChordMemory(const std::vector<int>& notes)
+{
+    if (notes.empty()) return;
+
+    // Sort notes and compute intervals from lowest
+    auto sorted = notes;
+    std::sort(sorted.begin(), sorted.end());
+
+    int root = sorted[0];
+    chordNoteCount = juce::jmin(static_cast<int>(sorted.size()), NUM_VOICES);
+    for (int i = 0; i < chordNoteCount; ++i)
+        chordIntervals[i] = sorted[static_cast<size_t>(i)] - root;
+
+    chordMemoryActive = true;
+    debugConsole.log("[CHORD] Stored %d notes: %d %d %d %d %d",
+                     chordNoteCount,
+                     chordNoteCount > 0 ? chordIntervals[0] : 0,
+                     chordNoteCount > 1 ? chordIntervals[1] : 0,
+                     chordNoteCount > 2 ? chordIntervals[2] : 0,
+                     chordNoteCount > 3 ? chordIntervals[3] : 0,
+                     chordNoteCount > 4 ? chordIntervals[4] : 0);
+}
+
+void UltimateProphetProcessor::clearChordMemory()
+{
+    chordMemoryActive = false;
+    chordNoteCount = 0;
+    for (auto& i : chordIntervals) i = 0;
+    debugConsole.log("[CHORD] Cleared");
 }
 
 void UltimateProphetProcessor::loadSysExFile(const juce::File& file)

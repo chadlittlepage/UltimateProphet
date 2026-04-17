@@ -90,6 +90,8 @@ private:
     // Performance
     Knob glideRate, vintage, pitchRange, masterVol, masterTune, unisonVoices;
     Toggle glideOn, unisonOn, velFilt, velAmp, releaseSwitch, atFilter, atLFO;
+    Combo keyPriority;
+    juce::TextButton chordMemBtn{"Chord"};
 
     // Patch browser
     juce::TextButton loadSyxButton{"Load .syx"};

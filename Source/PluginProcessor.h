@@ -40,6 +40,11 @@ public:
 
     void addKeyboardMidi(const juce::MidiMessage& msg);
 
+    // Chord memory: call with currently held notes to store chord
+    void storeChordMemory(const std::vector<int>& notes);
+    void clearChordMemory();
+    bool isChordMemoryActive() const { return chordMemoryActive; }
+
     DebugConsole debugConsole;
 
     // Patch management
@@ -64,8 +69,19 @@ private:
     uint64_t noteCounter = 0;
     bool unisonActive = false;
     float unisonDetuneAmount = 0.3f;
-    // Per-voice detune offsets (in semitones) for unison spread
     float voiceDetuneOffset[NUM_VOICES] = { 0.0f, -0.15f, 0.15f, -0.3f, 0.3f };
+
+    // Chord memory: stores interval offsets from root note
+    bool chordMemoryActive = false;
+    int chordIntervals[NUM_VOICES] = {};  // semitone offsets from lowest note
+    int chordNoteCount = 0;
+
+    // Key priority for unison: 0=Low, 1=Low-retrig, 2=Last, 3=Last-retrig
+    int keyPriorityMode = 2;  // default: Last note priority
+
+    // Track currently held notes for priority logic
+    std::vector<int> heldNotes;
+    int lastUnisonNote = -1;
 
     // LFO (shared across all voices)
     LFO lfo;
