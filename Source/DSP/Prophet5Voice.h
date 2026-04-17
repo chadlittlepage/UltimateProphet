@@ -110,6 +110,9 @@ public:
         // --- Rev switch: 0 = Rev 1/2 (SSM 2040), 1 = Rev 3 (CEM 3320) ---
         int filterRev = 1;  // default Rev 3
 
+        // --- Release switch ---
+        bool releaseSwitch = true;  // ON = use release knob, OFF = fast release
+
         // --- Unison detune (set per-voice by processor) ---
         float unisonDetuneSemitones = 0.0f;
     };

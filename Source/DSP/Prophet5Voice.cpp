@@ -73,14 +73,23 @@ float Prophet5Voice::process()
     updateDrift();
 
     // --- Update envelope parameters ---
-    filterEnv.setAttack(params.filterAttack);
-    filterEnv.setDecay(params.filterDecay);
+    // Vintage knob affects envelope timing per-voice (random variation)
+    float envDrift = 1.0f + driftSmoothFilter * params.vintage * 0.15f;
+
+    filterEnv.setAttack(params.filterAttack * envDrift);
+    filterEnv.setDecay(params.filterDecay * envDrift);
     filterEnv.setSustain(params.filterSustain);
-    filterEnv.setRelease(params.filterRelease);
-    ampEnv.setAttack(params.ampAttack);
-    ampEnv.setDecay(params.ampDecay);
+    filterEnv.setRelease(params.filterRelease * envDrift);
+    ampEnv.setAttack(params.ampAttack * envDrift);
+    ampEnv.setDecay(params.ampDecay * envDrift);
     ampEnv.setSustain(params.ampSustain);
-    ampEnv.setRelease(params.ampRelease);
+    ampEnv.setRelease(params.ampRelease * envDrift);
+
+    // Rev mode changes envelope shape + release switch
+    filterEnv.setRevMode(params.filterRev);
+    ampEnv.setRevMode(params.filterRev);
+    filterEnv.setReleaseEnabled(params.releaseSwitch);
+    ampEnv.setReleaseEnabled(params.releaseSwitch);
 
     // --- Glide (portamento) ---
     if (params.glideOn && params.glideRate > 0.001f)
@@ -314,7 +323,9 @@ float Prophet5Voice::process()
     // --- VCA ---
     float ampEnvVal = ampEnv.process();
     float velAmpScale = params.velToAmp ? velocity : 1.0f;
-    float output = filtered * ampEnvVal * velAmpScale;
+    // Vintage knob affects VCA gain per-voice (slight level differences)
+    float vcaDrift = 1.0f + driftSmoothA * params.vintage * 0.08f;
+    float output = filtered * ampEnvVal * velAmpScale * vcaDrift;
 
     return output;
 }

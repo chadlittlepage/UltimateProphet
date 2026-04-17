@@ -186,8 +186,9 @@ float SysExLoader::nrpnToVintage(int val)
 
 float SysExLoader::nrpnToFineTune(int val)
 {
-    // 0-127 → -7.0 to +7.0 semitones (64 = center)
-    return (static_cast<float>(val) - 64.0f) * 7.0f / 63.0f;
+    // 0-127 → 0.0 to 0.95 semitones (upward only, per manual)
+    // "adjusts the tuning of Oscillator B upward (sharp) and has a range of nearly a semitone"
+    return juce::jlimit(0.0f, 0.95f, static_cast<float>(val) / 127.0f * 0.95f);
 }
 
 float SysExLoader::nrpnToGlideRate(int val)

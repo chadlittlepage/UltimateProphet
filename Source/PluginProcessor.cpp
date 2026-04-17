@@ -59,7 +59,7 @@ UltimateProphetProcessor::createParameterLayout()
         juce::NormalisableRange<float>(0.0f, 120.0f, 0.1f), 60.0f));
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "oscBFineTune", "Osc B Fine Tune",
-        juce::NormalisableRange<float>(-7.0f, 7.0f, 0.01f), 0.0f));
+        juce::NormalisableRange<float>(0.0f, 0.95f, 0.001f), 0.0f));
     p.push_back(std::make_unique<juce::AudioParameterBool>("oscBSaw", "Osc B Saw", true));
     p.push_back(std::make_unique<juce::AudioParameterBool>("oscBTri", "Osc B Triangle", false));
     p.push_back(std::make_unique<juce::AudioParameterBool>("oscBPulse", "Osc B Pulse", false));
@@ -101,7 +101,7 @@ UltimateProphetProcessor::createParameterLayout()
     // ===== LFO =====
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "lfoFreq", "LFO Frequency",
-        juce::NormalisableRange<float>(0.1f, 30.0f, 0.01f, 0.4f), 5.0f));
+        juce::NormalisableRange<float>(0.022f, 500.0f, 0.001f, 0.25f), 5.0f));
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "lfoAmount", "LFO Initial Amount",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
@@ -113,6 +113,9 @@ UltimateProphetProcessor::createParameterLayout()
     p.push_back(std::make_unique<juce::AudioParameterBool>("lfoToPWA", "LFO > PW A", false));
     p.push_back(std::make_unique<juce::AudioParameterBool>("lfoToPWB", "LFO > PW B", false));
     p.push_back(std::make_unique<juce::AudioParameterBool>("lfoToFilter", "LFO > Filter", false));
+    p.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "lfoSrcMix", "LFO Source Mix",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));  // 0=LFO, 1=Noise
 
     // ===== POLY-MOD =====
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -139,6 +142,9 @@ UltimateProphetProcessor::createParameterLayout()
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
         "ampSus", "Amp Sustain", 0.0f, 1.0f, 0.8f));
     p.push_back(std::make_unique<juce::AudioParameterFloat>("ampRel", "Amp Release", envRange, 0.3f));
+
+    // ===== RELEASE SWITCH =====
+    p.push_back(std::make_unique<juce::AudioParameterBool>("releaseSwitch", "Release", true));
 
     // ===== PERFORMANCE =====
     p.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -272,6 +278,7 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     lfo.setSawEnabled(loadBool("lfoSaw"));
     lfo.setTriangleEnabled(loadBool("lfoTri"));
     lfo.setSquareEnabled(loadBool("lfoSquare"));
+    lfo.setSourceMix(load("lfoSrcMix"));
     float lfoAmt = load("lfoAmount");
     bool lfoFreqA = loadBool("lfoToFreqA");
     bool lfoFreqB = loadBool("lfoToFreqB");
@@ -299,6 +306,7 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     float pitchWheelRange = load("pitchWheelRange");
     bool velToFilter = loadBool("velToFilter");
     bool velToAmp = loadBool("velToAmp");
+    bool releaseSwitch = loadBool("releaseSwitch");
 
     smoothedMasterVolume.setTargetValue(load("masterVol"));
     float extInputLevel = load("extInput");
@@ -363,6 +371,7 @@ void UltimateProphetProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             voice.params.filterCutoff = cutoff;
             voice.params.filterResonance = reso;
             voice.params.filterRev = filterRev;
+            voice.params.releaseSwitch = releaseSwitch;
             voice.params.filterEnvAmount = filtEnvAmt;
             voice.params.filterKeyTrack = filtKeyTrack;
 
