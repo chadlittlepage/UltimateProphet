@@ -124,4 +124,4 @@ A S D F G H J K L ;       (white keys)
 
 ## License
 
-Open source. By CELL DIVISION / Kings of Confetti.
+Proprietary. Copyright (c) 2026 CELL DIVISION / Kings of Confetti. All rights reserved. Source code is viewable for educational purposes only. See [LICENSE](LICENSE) for details.
