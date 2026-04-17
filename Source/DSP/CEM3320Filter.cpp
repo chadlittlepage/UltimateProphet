@@ -5,6 +5,13 @@ void CEM3320Filter::prepare(double sr, int oversamplingFactor)
     sampleRate = sr * oversamplingFactor;
     oversampling = oversamplingFactor;
     reset();
+
+    // Buffer slew rate: 1.5 V/uS from datasheet
+    // At normalized ±1 signal range, this corresponds to ~18kHz bandwidth
+    // Model as one-pole LPF: coeff = 1 - exp(-2*pi*fc/fs)
+    float slewBW = 18000.0f;
+    slewCoeff = 1.0f - std::exp(-2.0f * juce::MathConstants<float>::pi
+              * slewBW / static_cast<float>(sampleRate));
 }
 
 void CEM3320Filter::setCutoff(float hz)
@@ -29,60 +36,94 @@ void CEM3320Filter::setEnvelopeAmount(float amount)
 
 void CEM3320Filter::reset()
 {
-    for (auto& s : stage)
-        s = 0.0f;
+    for (auto& s : stage) s = 0.0f;
+    for (auto& s : slewState) s = 0.0f;
     lastOutput = 0.0f;
 }
 
 float CEM3320Filter::process(float input)
 {
-    // TPT coefficient
+    // --- Input attenuation ---
+    // Prophet-5 Rev 3: audio enters through 169k resistor (R82)
+    // This reduces the signal level before the OTA stages
+    float attenuatedInput = input * INPUT_ATTEN;
+
+    // --- TPT coefficient ---
     float g = std::tan(juce::MathConstants<float>::pi * cutoffHz
             / static_cast<float>(sampleRate));
     float G = g / (1.0f + g);
 
-    // Resonance: 0-1 maps to k = 0..4.25
-    float k = resonance * 4.25f;
+    // --- Resonance ---
+    // CEM 3320: resonance feedback from stage 4 output through
+    // the 3k/3.6k voltage divider (RES_DIVIDER = 0.545)
+    // k = 0 to 4.0 for self-oscillation
+    float k = resonance * 4.0f;
 
-    // Gain compensation: moderate, allows some bass thinning
-    // (authentic CEM 3320 behavior — bass drops with resonance)
-    float compensation = 1.0f + k * 0.6f;
+    // Feedback signal through the resonance divider
+    float feedback = lastOutput * RES_DIVIDER;
 
-    // Feedback from 4th stage output (one sample delayed)
-    float u = input * compensation - k * lastOutput;
+    // Gain compensation: boost input to counter the bass loss from
+    // negative feedback. The Prophet-5 circuit has gain staging that
+    // partially compensates for this.
+    float compensation = 1.0f + k * 0.5f;
 
-    // --- CEM 3320 OTA Cascade ---
+    float u = attenuatedInput * compensation - k * feedback;
+
+    // --- 4 Cascaded OTA Integrator Stages ---
     //
-    // The CEM 3320 uses: I = g * tanh(V+ - V-)
-    // The tanh is applied to the DIFFERENCE (input - state),
-    // not to the input alone. This is the key distinction from
-    // the Moog ladder and gives the CEM its "cutting, sizzley"
-    // resonance character with predominantly even-harmonic distortion.
+    // CEM 3320 OTA transfer: I = Iabc * tanh((V+ - V-) / 2Vt)
     //
-    // Vt controls where saturation kicks in. The CEM 3320 OTA
-    // input saturates at roughly +/-50-100mV in the real circuit,
-    // but our signals are normalized differently. Vt = 1.2 gives
-    // gentle saturation that produces the focused, bright character.
-    static constexpr float Vt = 1.2f;
+    // The differential input is saturated BEFORE integration.
+    // Cell gain at Vcf=0 is 0.9 (not 1.0), capped at 3.0 max.
+    //
+    // We model this as:
+    //   saturatedDiff = CELL_GAIN * tanh(diff / Vt) * Vt
+    //
+    // where Vt is chosen so that:
+    //   - Small signals: gain ≈ CELL_GAIN (0.9)
+    //   - Large signals: soft clip at ±CLIP_LEVEL
+    //
+    // tanh(x) has derivative 1.0 at x=0, so:
+    //   CELL_GAIN * tanh(diff/Vt) * Vt gives small-signal gain = CELL_GAIN
+    //   Saturation at ±(CELL_GAIN * Vt)
+
+    static constexpr float Vt = 1.5f;  // thermal voltage (normalized)
 
     float out = u;
     for (int i = 0; i < 4; ++i)
     {
-        // CEM 3320 OTA: tanh applied to the (input - state) DIFFERENCE
+        // CEM 3320 OTA: differential input, then saturate
         float diff = out - stage[i];
-        float saturatedDiff = std::tanh(diff / Vt) * Vt;
+        float saturatedDiff = CELL_GAIN * std::tanh(diff / Vt) * Vt;
+
+        // Clamp to max cell gain (3.0x from datasheet)
+        float maxOut = MAX_CELL_GAIN * std::abs(diff);
+        if (std::abs(saturatedDiff) > maxOut && maxOut > 0.001f)
+            saturatedDiff = (saturatedDiff > 0 ? maxOut : -maxOut);
+
+        // TPT integration
         float v = G * saturatedDiff;
-        out = v + stage[i];       // OUTPUT to next stage
-        stage[i] = out + v;       // STATE update (trapezoidal)
+        out = v + stage[i];       // OUTPUT
+        stage[i] = out + v;       // STATE (trapezoidal)
+
+        // Buffer slew rate limiting (1.5 V/uS modeled as LPF)
+        slewState[i] += slewCoeff * (out - slewState[i]);
+        out = slewState[i];
+
+        // Output clipping at ±6V (12 Vpp from datasheet, normalized)
+        out = juce::jlimit(-CLIP_LEVEL, CLIP_LEVEL, out);
     }
+
+    // Scale output back up (compensate for input attenuation)
+    out /= INPUT_ATTEN;
 
     lastOutput = out;
 
     // Denormal / NaN protection
-    for (auto& s : stage)
+    for (int i = 0; i < 4; ++i)
     {
-        if (!(s > -100.0f && s < 100.0f))
-            s = 0.0f;
+        if (!(stage[i] > -100.0f && stage[i] < 100.0f)) stage[i] = 0.0f;
+        if (!(slewState[i] > -100.0f && slewState[i] < 100.0f)) slewState[i] = 0.0f;
     }
     if (!(lastOutput > -100.0f && lastOutput < 100.0f))
         lastOutput = 0.0f;
