@@ -18,22 +18,41 @@ UltimateProphetProcessor::UltimateProphetProcessor()
 
     // Auto-load factory patches if found
     auto exePath = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
-    // Search several likely locations for the factory .syx
+    auto appBundle = exePath.getParentDirectory().getParentDirectory().getParentDirectory();
+
     juce::StringArray searchPaths = {
+        // Direct path (development)
         "/Users/chadlittlepage/Documents/APPs/UltimateProphet/Patches",
+        // Relative to app bundle (standalone)
+        appBundle.getChildFile("Patches").getFullPathName(),
+        // Up from build artifacts to project root
+        appBundle.getParentDirectory().getParentDirectory().getParentDirectory()
+            .getParentDirectory().getParentDirectory().getChildFile("Patches").getFullPathName(),
+        // Relative to exe
         exePath.getParentDirectory().getChildFile("Patches").getFullPathName(),
-        exePath.getParentDirectory().getParentDirectory().getChildFile("Patches").getFullPathName(),
+        // Next to the .app
+        appBundle.getParentDirectory().getChildFile("Patches").getFullPathName(),
+        // Home directory
+        juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+            .getChildFile("Documents/APPs/UltimateProphet/Patches").getFullPathName(),
     };
 
+    bool foundPatches = false;
     for (auto& path : searchPaths)
     {
         juce::File factoryFile(path + "/P5_Factory_Programs_FACTORY_v1.03.syx");
+        debugConsole.log("[INIT] Trying: %s -> %s",
+                         path.toRawUTF8(),
+                         factoryFile.existsAsFile() ? "FOUND" : "not found");
         if (factoryFile.existsAsFile())
         {
             loadSysExFile(factoryFile);
+            foundPatches = true;
             break;
         }
     }
+    if (!foundPatches)
+        debugConsole.log("[INIT] No factory patches found - use Load .syx");
 }
 
 UltimateProphetProcessor::~UltimateProphetProcessor() {}

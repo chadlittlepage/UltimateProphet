@@ -57,7 +57,7 @@ DebugConsolePanel::DebugConsolePanel(DebugConsole& c)
     logView.setReadOnly(true);
     logView.setScrollbarsShown(true);
     logView.setCaretVisible(false);
-    logView.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 11.0f, 0));
+    logView.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 13.0f, 0));
     logView.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff0A0A0E));
     logView.setColour(juce::TextEditor::textColourId, juce::Colour(0xff40FF40));
     logView.setColour(juce::TextEditor::outlineColourId, juce::Colour(0xff2A2A30));
