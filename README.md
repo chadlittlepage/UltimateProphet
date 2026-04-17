@@ -111,16 +111,6 @@ A S D F G H J K L ;       (white keys)
 - Left/Right arrows = prev/next patch
 - Backtick = toggle debug console
 
-## Technical References
-
-- Sequential Circuits Prophet-5 Technical Manual (Rev 3)
-- Sequential Prophet-5 User's Guide v1.3
-- Sequential Prophet-5 MIDI Implementation v1.4
-- CEM 3340 VCO Datasheet
-- CEM 3320 VCF Datasheet (Electric Druid)
-- CEM 3310 Envelope Generator Datasheet
-- Prophet-5 Rev 2 Service Manual (SSM 2040 schematics)
-- Zavalishin, "The Art of VA Filter Design"
 
 ## License
 
