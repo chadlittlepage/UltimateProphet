@@ -57,7 +57,7 @@ DebugConsolePanel::DebugConsolePanel(DebugConsole& c)
     logView.setReadOnly(true);
     logView.setScrollbarsShown(true);
     logView.setCaretVisible(false);
-    logView.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 13.0f, 0));
+    logView.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 16.0f, 0));
     logView.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff0A0A0E));
     logView.setColour(juce::TextEditor::textColourId, juce::Colour(0xff40FF40));
     logView.setColour(juce::TextEditor::outlineColourId, juce::Colour(0xff2A2A30));
@@ -72,7 +72,7 @@ DebugConsolePanel::DebugConsolePanel(DebugConsole& c)
     // Status labels
     auto setupLabel = [this](juce::Label& label)
     {
-        label.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 10.0f, 0));
+        label.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 14.0f, 0));
         label.setColour(juce::Label::textColourId, juce::Colour(0xff80C0FF));
         label.setJustificationType(juce::Justification::centredLeft);
         addAndMakeVisible(label);
