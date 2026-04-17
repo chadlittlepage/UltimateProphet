@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../JUCE ${CMAKE_BINARY_DIR}/JUCE)
 
 juce_add_plugin(UltimateProphet
-    COMPANY_NAME "CellDivision"
+    COMPANY_NAME "CELL DIVISION"
     PLUGIN_MANUFACTURER_CODE Cldv
     PLUGIN_CODE Upro
     FORMATS AU VST3 Standalone
