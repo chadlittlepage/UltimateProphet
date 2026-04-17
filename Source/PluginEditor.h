@@ -96,6 +96,9 @@ private:
     juce::TextButton prevPatchButton{"<"};
     juce::TextButton nextPatchButton{">"};
     juce::Label patchNameLabel;
+    void showPatchBrowser();
+    void nextPatch();
+    void prevPatch();
 
     // Octave/velocity display
     juce::Label statusLabel;

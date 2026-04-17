@@ -162,27 +162,20 @@ UltimateProphetEditor::UltimateProphetEditor(UltimateProphetProcessor& p)
 
     prevPatchButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2A2A2E));
     prevPatchButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffD4A843));
-    prevPatchButton.onClick = [this] {
-        int idx = processorRef.currentPatchIndex - 1;
-        if (idx >= 0) { processorRef.selectPatch(idx); updatePatchLabel(); }
-    };
+    prevPatchButton.onClick = [this] { prevPatch(); };
     addAndMakeVisible(prevPatchButton);
 
     nextPatchButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2A2A2E));
     nextPatchButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffD4A843));
-    nextPatchButton.onClick = [this] {
-        int idx = processorRef.currentPatchIndex + 1;
-        if (idx < processorRef.getNumLoadedPatches()) {
-            processorRef.selectPatch(idx);
-            updatePatchLabel();
-        }
-    };
+    nextPatchButton.onClick = [this] { nextPatch(); };
     addAndMakeVisible(nextPatchButton);
 
     patchNameLabel.setText("No patches loaded", juce::dontSendNotification);
     patchNameLabel.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 12.0f, 0));
     patchNameLabel.setColour(juce::Label::textColourId, juce::Colour(0xff40FF40));
     patchNameLabel.setJustificationType(juce::Justification::centredLeft);
+    patchNameLabel.setInterceptsMouseClicks(true, false);
+    patchNameLabel.addMouseListener(this, false);
     addAndMakeVisible(patchNameLabel);
 
     // Status label
@@ -239,6 +232,10 @@ bool UltimateProphetEditor::keyPressed(const juce::KeyPress& key, juce::Componen
     }
     if (tc == '`') { consolePanel.toggleVisibility(); return true; }
 
+    // Arrow keys: left/right = prev/next patch
+    if (jk == juce::KeyPress::leftKey)  { prevPatch(); return true; }
+    if (jk == juce::KeyPress::rightKey) { nextPatch(); return true; }
+
     int noteOffset = getNoteForKey(tc);
     if (noteOffset >= 0) {
         if (heldKeys.find(jk) == heldKeys.end()) {
@@ -266,6 +263,64 @@ bool UltimateProphetEditor::keyStateChanged(bool, juce::Component*)
 
 void UltimateProphetEditor::timerCallback() { keyStateChanged(false, nullptr); }
 
+void UltimateProphetEditor::nextPatch()
+{
+    int idx = processorRef.currentPatchIndex + 1;
+    if (idx < processorRef.getNumLoadedPatches())
+    {
+        processorRef.selectPatch(idx);
+        updatePatchLabel();
+    }
+}
+
+void UltimateProphetEditor::prevPatch()
+{
+    int idx = processorRef.currentPatchIndex - 1;
+    if (idx >= 0)
+    {
+        processorRef.selectPatch(idx);
+        updatePatchLabel();
+    }
+}
+
+void UltimateProphetEditor::showPatchBrowser()
+{
+    int total = processorRef.getNumLoadedPatches();
+    if (total <= 0) return;
+
+    auto menu = juce::PopupMenu();
+
+    // Group patches into banks of 40 (matching Prophet-5 organization)
+    for (int bank = 0; bank * 40 < total; ++bank)
+    {
+        auto bankMenu = juce::PopupMenu();
+        int start = bank * 40;
+        int end = juce::jmin(start + 40, total);
+
+        for (int i = start; i < end; ++i)
+        {
+            juce::String label = juce::String(i + 1) + ". " + processorRef.getPatchName(i);
+            bool isCurrent = (i == processorRef.currentPatchIndex);
+            bankMenu.addItem(i + 1, label, true, isCurrent);
+        }
+
+        juce::String bankName = "Bank " + juce::String(bank + 1)
+                              + " (" + juce::String(start + 1) + "-" + juce::String(end) + ")";
+        menu.addSubMenu(bankName, bankMenu);
+    }
+
+    menu.showMenuAsync(juce::PopupMenu::Options()
+        .withTargetComponent(&patchNameLabel)
+        .withMinimumWidth(300),
+        [this](int result) {
+            if (result > 0)
+            {
+                processorRef.selectPatch(result - 1);
+                updatePatchLabel();
+            }
+        });
+}
+
 void UltimateProphetEditor::updatePatchLabel()
 {
     int idx = processorRef.currentPatchIndex;
@@ -280,6 +335,13 @@ void UltimateProphetEditor::updatePatchLabel()
 
 void UltimateProphetEditor::mouseDown(const juce::MouseEvent& e)
 {
+    // Click on patch name opens browser
+    if (e.eventComponent == &patchNameLabel)
+    {
+        showPatchBrowser();
+        return;
+    }
+
     grabKeyboardFocus();
     AudioProcessorEditor::mouseDown(e);
 }

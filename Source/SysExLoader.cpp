@@ -137,10 +137,10 @@ float SysExLoader::nrpnToResonance(int val)
 
 float SysExLoader::nrpnToEnvTime(int val)
 {
-    // CEM 3310: exponential timing, 0-120 maps to ~0.5ms to ~10s
-    // Using exponential curve: time = 0.0005 * exp(val * ln(20000) / 120)
+    // CEM 3310: exponential timing across 4 decades
+    // 0 = 1ms, 120 = 10s (confirmed from CEM 3310 datasheet)
     if (val <= 0) return 0.001f;
-    float t = 0.0005f * std::exp(static_cast<float>(val) * 9.9f / 120.0f);
+    float t = 0.001f * std::pow(10000.0f, static_cast<float>(val) / 120.0f);
     return juce::jlimit(0.001f, 10.0f, t);
 }
 
@@ -168,15 +168,17 @@ float SysExLoader::nrpnToLevel(int val)
 
 float SysExLoader::nrpnToLFOFreq(int val)
 {
-    // 0-120 → 0.1-30 Hz exponential
+    // 0-120 → 0.022-500 Hz exponential (per manual: ".022Hz to 500Hz")
     float t = static_cast<float>(val) / 120.0f;
-    return 0.1f * std::pow(300.0f, t);  // 0.1 * 300^t goes from 0.1 to 30
+    return 0.022f * std::pow(500.0f / 0.022f, t);
 }
 
 float SysExLoader::nrpnToFilterEnvAmt(int val)
 {
-    // 0-120 → -1.0 to +1.0 (bipolar, 60 = center)
-    return juce::jlimit(-1.0f, 1.0f, (static_cast<float>(val) - 60.0f) / 60.0f);
+    // Prophet-5 filter env amount is UNIPOLAR (0=none, 120=max)
+    // The original hardware knob only goes from 0 to max.
+    // Bipolar sweeps are achieved via Poly-Mod, not the env amount knob.
+    return juce::jlimit(0.0f, 1.0f, static_cast<float>(val) / 120.0f);
 }
 
 float SysExLoader::nrpnToVintage(int val)
