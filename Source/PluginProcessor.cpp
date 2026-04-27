@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "BinaryData.h"
 
 static const char* midiNoteName(int note)
 {
@@ -174,28 +175,17 @@ void UltimateProphetProcessor::loadFactoryPatchesIfNeeded()
     if (patchesLoaded) return;
     patchesLoaded = true;
 
-    auto exePath = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
-    auto appBundle = exePath.getParentDirectory().getParentDirectory().getParentDirectory();
+    // Load factory patches from embedded BinaryData (always available)
+    auto patches = SysExLoader::loadFromData(
+        reinterpret_cast<const uint8_t*>(BinaryData::P5_Factory_Programs_FACTORY_v1_03_syx),
+        static_cast<size_t>(BinaryData::P5_Factory_Programs_FACTORY_v1_03_syxSize));
 
-    juce::StringArray searchPaths = {
-        "/Users/chadlittlepage/Documents/APPs/UltimateProphet/Patches",
-        appBundle.getChildFile("Patches").getFullPathName(),
-        appBundle.getParentDirectory().getParentDirectory().getParentDirectory()
-            .getParentDirectory().getParentDirectory().getChildFile("Patches").getFullPathName(),
-        exePath.getParentDirectory().getChildFile("Patches").getFullPathName(),
-        appBundle.getParentDirectory().getChildFile("Patches").getFullPathName(),
-        juce::File::getSpecialLocation(juce::File::userHomeDirectory)
-            .getChildFile("Documents/APPs/UltimateProphet/Patches").getFullPathName(),
-    };
-
-    for (auto& path : searchPaths)
+    if (!patches.empty())
     {
-        juce::File factoryFile(path + "/P5_Factory_Programs_FACTORY_v1.03.syx");
-        if (factoryFile.existsAsFile())
-        {
-            loadSysExFile(factoryFile);
-            break;
-        }
+        loadedPatches = std::move(patches);
+        debugConsole.log("[SYSEX] Loaded %d factory patches from embedded data",
+                         static_cast<int>(loadedPatches.size()));
+        selectPatch(0);
     }
 
     loadUserPatches();

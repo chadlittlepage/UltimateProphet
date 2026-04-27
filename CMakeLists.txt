@@ -25,6 +25,12 @@ juce_add_plugin(UltimateProphet
     COPY_PLUGIN_AFTER_BUILD TRUE
 )
 
+# Embed factory patches as binary resources inside the plugin
+juce_add_binary_data(FactoryPatches SOURCES
+    Patches/P5_Factory_Programs_FACTORY_v1.03.syx
+    Patches/P5_Factory_Programs_USER_v1.03.syx
+)
+
 target_sources(UltimateProphet
     PRIVATE
         Source/PluginProcessor.cpp
@@ -58,6 +64,7 @@ target_link_libraries(UltimateProphet
     PRIVATE
         juce::juce_audio_utils
         juce::juce_dsp
+        FactoryPatches
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
